@@ -23,10 +23,11 @@ interface FolderTreeItemProps {
     orgId: string;
     level?: number;
     onCreateSubFolder?: (parentId: string) => void;
+    onNavigate?: () => void;
     index: number;
 }
 
-export function FolderTreeItem({ folder, orgId, level = 0, onCreateSubFolder, index }: FolderTreeItemProps) {
+export function FolderTreeItem({ folder, orgId, level = 0, onCreateSubFolder, onNavigate, index }: FolderTreeItemProps) {
     const [isOpen, setIsOpen] = useState(true);
     const [isEditing, setIsEditing] = useState(false);
     const [editName, setEditName] = useState(folder.name);
@@ -209,6 +210,7 @@ export function FolderTreeItem({ folder, orgId, level = 0, onCreateSubFolder, in
                                                 orgId={orgId}
                                                 level={level + 1}
                                                 onCreateSubFolder={onCreateSubFolder}
+                                                onNavigate={onNavigate}
                                                 index={idx}
                                             />
                                         ))}
@@ -219,6 +221,7 @@ export function FolderTreeItem({ folder, orgId, level = 0, onCreateSubFolder, in
                                                 orgId={orgId}
                                                 level={level + 1}
                                                 index={idx + folder.children.length}
+                                                onNavigate={onNavigate}
                                             />
                                         ))}
                                         {droppableProvided.placeholder}
@@ -233,7 +236,19 @@ export function FolderTreeItem({ folder, orgId, level = 0, onCreateSubFolder, in
     );
 }
 
-export function ProjectTreeItem({ project, orgId, level, index }: { project: Project; orgId: string; level: number; index: number }) {
+export function ProjectTreeItem({
+    project,
+    orgId,
+    level,
+    index,
+    onNavigate,
+}: {
+    project: Project;
+    orgId: string;
+    level: number;
+    index: number;
+    onNavigate?: () => void;
+}) {
     const pathname = usePathname();
     const href = `/org/${orgId}/projects/${project.id}/graph`;
     const isActive = pathname?.includes(project.id);
@@ -317,7 +332,7 @@ export function ProjectTreeItem({ project, orgId, level, index }: { project: Pro
                                 autoFocus
                             />
                         ) : (
-                            <Link href={href} className="text-sm truncate flex-1">
+                            <Link href={href} onClick={onNavigate} className="text-sm truncate flex-1">
                                 {project.name}
                             </Link>
                         )}

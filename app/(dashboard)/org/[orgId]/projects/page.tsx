@@ -189,7 +189,7 @@ export default function OrgProjectsPage() {
         />
         {/* Render Children (Nested Folders) with indentation */}
         {folder.children.length > 0 && (
-          <div className="pl-6 border-l border-border/50 ml-2 mt-2">
+          <div className="ml-2 mt-2 border-l border-border/50 pl-4 sm:pl-6">
             {folder.children.map(renderFolderSection)}
           </div>
         )}
@@ -198,11 +198,11 @@ export default function OrgProjectsPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5 sm:space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold">Projects</h1>
-        <Button asChild>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <h1 className="text-2xl font-bold sm:text-3xl">Projects</h1>
+        <Button asChild className="w-full sm:w-auto">
           <Link href={`/org/${orgId}/projects/new`}>
             <Plus className="h-4 w-4 mr-2" />
             New Project
@@ -225,7 +225,7 @@ export default function OrgProjectsPage() {
             </p>
           </div>
         ) : (
-          <div className="space-y-8">
+          <div className="space-y-6 sm:space-y-8">
             {/* 
                 Scenario A: 'All' Tab -> Hierarchy View 
                 Scenario B: Filtered Tab -> Flat View 
@@ -258,7 +258,7 @@ export default function OrgProjectsPage() {
               </>
             ) : (
               /* Flat List for filtered tabs */
-              <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
                 <FolderSection
                   folder={{
                     id: activeTab,

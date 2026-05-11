@@ -24,7 +24,7 @@ export function FolderSection({ folder, projects, orgId, onExpandToggle, isDropZ
     };
 
     const ProjectList = (
-        <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3 min-h-[50px]">
+        <div className="grid min-h-[50px] grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
             {projects.map((project, index) => (
                 isDropZone ? (
                     <Draggable key={project.id} draggableId={project.id} index={index}>
@@ -65,19 +65,19 @@ export function FolderSection({ folder, projects, orgId, onExpandToggle, isDropZ
         <div className="mb-6">
             {/* Folder Header */}
             <div
-                className="flex items-center justify-between px-1 py-2 mb-3 group cursor-pointer select-none"
+                className="group mb-3 flex cursor-pointer select-none items-center justify-between gap-3 px-1 py-2"
                 onClick={handleToggle}
                 id={`folder-${folder.id}`}
             >
-                <div className="flex items-center gap-2">
+                <div className="flex min-w-0 items-center gap-2">
                     <ChevronRight
                         className={cn(
                             "h-4 w-4 text-muted-foreground transition-transform",
                             isExpanded && "rotate-90"
                         )}
                     />
-                    <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
-                        {folder.name}
+                    <h3 className="flex min-w-0 items-center gap-2 text-sm font-semibold text-foreground">
+                        <span className="truncate">{folder.name}</span>
                         <span className="text-xs font-normal text-muted-foreground">
                             ({projects.length})
                         </span>
@@ -92,7 +92,7 @@ export function FolderSection({ folder, projects, orgId, onExpandToggle, isDropZ
                 {/* Add Project Button (TODO: implement functionality) */}
                 <Link
                     href={`/org/${orgId}/projects/new?folderId=${folder.id}`}
-                    className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-accent rounded"
+                    className="shrink-0 rounded p-1 transition-opacity hover:bg-accent sm:opacity-0 sm:group-hover:opacity-100"
                     onClick={(e) => e.stopPropagation()}
                     title="Add project to this folder"
                 >

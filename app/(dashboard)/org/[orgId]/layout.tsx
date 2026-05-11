@@ -1,4 +1,4 @@
-import { Sidebar } from "@/components/layout/Sidebar";
+import { DashboardShell } from "@/components/layout/DashboardShell";
 
 export default async function OrgLayout({
   children,
@@ -9,14 +9,5 @@ export default async function OrgLayout({
 }) {
   const { orgId } = await params;
 
-  return (
-    <div className="flex h-screen overflow-hidden">
-      <Sidebar currentOrgId={orgId} />
-      <main className="flex-1 overflow-y-auto bg-gray-50">
-        <div className="container mx-auto px-6 py-8">
-          {children}
-        </div>
-      </main>
-    </div>
-  );
+  return <DashboardShell currentOrgId={orgId}>{children}</DashboardShell>;
 }

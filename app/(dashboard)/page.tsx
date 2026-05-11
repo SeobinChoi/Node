@@ -1,4 +1,4 @@
-import { getCurrentUserWorkspaces } from "@/lib/workspaces";
+import { ensureCurrentUserWorkspace, getCurrentUserWorkspaces } from "@/lib/workspaces";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
@@ -41,14 +41,6 @@ export default async function DashboardPage() {
     redirect(`/org/${firstWorkspace.orgId}/projects`);
   }
 
-  return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="mx-auto max-w-md rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-sm">
-        <h2 className="text-lg font-semibold text-slate-900">No workspaces yet</h2>
-        <p className="mt-2 text-sm text-slate-600">
-          Create a workspace or join one with an invite code to get started.
-        </p>
-      </div>
-    </div>
-  );
+  const workspace = await ensureCurrentUserWorkspace();
+  redirect(`/org/${workspace.orgId}/projects`);
 }

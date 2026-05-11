@@ -7,6 +7,7 @@ import { createActivityLog } from "@/lib/utils/activity-log";
 import { z } from "zod";
 import { NodeType, ManualStatus } from "@/types";
 import { triggerUnblockedNotifications, createNotification, triggerNodeAssignmentNotifications } from "@/lib/utils/notifications";
+import { Prisma } from "@prisma/client";
 
 const UpdateNodeSchema = z.object({
   title: z.string().min(1).max(200).optional(),
@@ -240,6 +241,9 @@ export async function PATCH(
 
     const authResponse = authOrPermissionErrorResponse(error);
     if (authResponse) return authResponse;
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025") {
+      return NextResponse.json({ error: "Node not found" }, { status: 404 });
+    }
 
     console.error("PATCH /api/nodes/[nodeId] error:", error);
     return NextResponse.json({ error: "Failed to update node" }, { status: 500 });
@@ -261,12 +265,13 @@ export async function DELETE(
     });
 
     if (!existingNode) {
-      return NextResponse.json({ error: "Node not found" }, { status: 404 });
+      return NextResponse.json({ success: true, alreadyDeleted: true });
     }
 
     await requireProjectEdit(existingNode.projectId, user.id);
 
-    // Delete node and decrement organization nodeCount in a transaction
+    // Delete node, update counts, and log atomically so the client never sees a
+    // failed deletion response after the row was already removed.
     await prisma.$transaction(async (tx) => {
       await tx.node.delete({
         where: { id: nodeId },
@@ -276,18 +281,18 @@ export async function DELETE(
         where: { id: existingNode.orgId },
         data: { nodeCount: { decrement: 1 } },
       });
-    });
 
-    // Log activity
-    await createActivityLog({
-      projectId: existingNode.projectId,
-      userId: user.id,
-      action: "DELETE_NODE",
-      entityType: "NODE",
-      entityId: nodeId,
-      details: {
-        title: existingNode.title,
-      },
+      await createActivityLog({
+        orgId: existingNode.orgId,
+        projectId: existingNode.projectId,
+        userId: user.id,
+        action: "DELETE_NODE",
+        entityType: "NODE",
+        entityId: nodeId,
+        details: {
+          title: existingNode.title,
+        },
+      }, tx);
     });
 
     return NextResponse.json({ success: true });

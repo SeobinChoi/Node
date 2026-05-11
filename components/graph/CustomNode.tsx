@@ -1,4 +1,4 @@
-import { memo, useCallback, useState, useEffect } from "react";
+import { memo, useCallback, useLayoutEffect, useRef, useState } from "react";
 import { Handle, Position } from "reactflow";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -6,14 +6,11 @@ import { NodeDTO, ManualStatus } from "@/types";
 import { CreateRequestDialog } from "./CreateRequestDialog";
 import { cn } from "@/lib/utils";
 import {
-  Loader2,
   User,
   Clock,
   Calendar,
   Plus,
   Ban,
-  Sparkles,
-  X,
   PanelRightOpen,
   CheckCircle2,
   PlayCircle,
@@ -47,27 +44,15 @@ interface CustomNodeProps {
     blockedBy: string[];
     blocking: string[];
     isFaded?: boolean;
+    isDragging?: boolean;
+    isDropTarget?: boolean;
+    isDetachTarget?: boolean;
     onOpenDetail?: () => void;
     onCreateChild?: () => void;
     onDetachFromParent?: () => void;
+    onPendingSaveChange?: (delta: number) => void;
   };
   selected?: boolean;
-}
-
-interface BlockingReason {
-  targetTitle: string;
-  actionNeeded: string;
-}
-
-interface SuggestedActor {
-  name: string;
-  nextStep: string;
-}
-
-interface AIAnalysis {
-  summary?: string;
-  blockingReasons?: BlockingReason[];
-  whoShouldAct?: SuggestedActor[];
 }
 
 function getInitials(name: string | null) {
@@ -81,7 +66,19 @@ function getInitials(name: string | null) {
 }
 
 export const CustomNode = memo(({ data, selected }: CustomNodeProps) => {
-  const { node, projectId, onDataChange, isFaded, onOpenDetail, onCreateChild, onDetachFromParent } = data;
+  const {
+    node,
+    projectId,
+    onDataChange,
+    isFaded,
+    isDragging,
+    isDropTarget,
+    isDetachTarget,
+    onOpenDetail,
+    onCreateChild,
+    onDetachFromParent,
+    onPendingSaveChange,
+  } = data;
   const [createRequestOpen, setCreateRequestOpen] = useState(false);
   const updateNodeMutation = useUpdateNode();
 
@@ -92,37 +89,9 @@ export const CustomNode = memo(({ data, selected }: CustomNodeProps) => {
   // Metadata
   const [members, setMembers] = useState<Member[]>([]);
   const [hasLoadedMetadata, setHasLoadedMetadata] = useState(false);
-
-  // AI Analysis (Subtle trigger)
-  const [aiAnalysis, setAiAnalysis] = useState<AIAnalysis | null>(null);
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [showAnalysis, setShowAnalysis] = useState(false);
-  const [analyzeError, setAnalyzeError] = useState<string | null>(null);
-
-  const analyzeBlock = async () => {
-    if (isAnalyzing) return;
-    setIsAnalyzing(true);
-    setAnalyzeError(null);
-    try {
-      const res = await fetch("/api/ai/analyze-block", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ nodeId: node.id }),
-      });
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || "Failed to analyze");
-      }
-      const data = await res.json();
-      setAiAnalysis(data);
-      setShowAnalysis(true);
-    } catch (error) {
-      setAnalyzeError(error instanceof Error ? error.message : "Failed to analyze");
-      setShowAnalysis(true);
-    } finally {
-      setIsAnalyzing(false);
-    }
-  };
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  const collapsedContentRef = useRef<HTMLDivElement | null>(null);
+  const [handleTop, setHandleTop] = useState<number | null>(null);
 
   const fetchMetadata = useCallback(async () => {
     try {
@@ -137,20 +106,16 @@ export const CustomNode = memo(({ data, selected }: CustomNodeProps) => {
     }
   }, [projectId]);
 
-  useEffect(() => {
-    if (selected && !hasLoadedMetadata) {
-      fetchMetadata();
-    }
-  }, [fetchMetadata, selected, hasLoadedMetadata]);
-
-
   // Updating Logic
   const updateNode = async (updates: Partial<NodeDTO> & { ownerIds?: string[] }, e?: React.MouseEvent | React.FocusEvent | React.KeyboardEvent) => {
     if (e) e.stopPropagation();
+    onPendingSaveChange?.(1);
     updateNodeMutation.mutate({
       nodeId: node.id,
       projectId,
       updates
+    }, {
+      onSettled: () => onPendingSaveChange?.(-1)
     });
   };
 
@@ -180,13 +145,41 @@ export const CustomNode = memo(({ data, selected }: CustomNodeProps) => {
   const isDone = node.computedStatus === "DONE";
   const childCount = node.childCount || 0;
   const isContainer = childCount > 0;
-  const blockingReasons = aiAnalysis?.blockingReasons ?? [];
-  const suggestedActors = aiAnalysis?.whoShouldAct ?? [];
+
+  useLayoutEffect(() => {
+    if (isContainer) return;
+
+    const root = rootRef.current;
+    const collapsedContent = collapsedContentRef.current;
+    if (!root || !collapsedContent) return;
+
+    const updateHandleTop = () => {
+      const rootRect = root.getBoundingClientRect();
+      const collapsedRect = collapsedContent.getBoundingClientRect();
+      const nextHandleTop = collapsedRect.top - rootRect.top + collapsedRect.height / 2;
+      setHandleTop((current) => Math.abs((current ?? 0) - nextHandleTop) > 0.5 ? nextHandleTop : current);
+    };
+
+    updateHandleTop();
+
+    const resizeObserver = new ResizeObserver(updateHandleTop);
+    resizeObserver.observe(root);
+    resizeObserver.observe(collapsedContent);
+
+    return () => resizeObserver.disconnect();
+  }, [isContainer, node.title, node.computedStatus, node.dueAt, node.blocksCount, node.owners, node.teams]);
+
+  const handleStyle = isContainer
+    ? undefined
+    : {
+      top: handleTop === null ? "4rem" : `${handleTop}px`,
+    };
 
   return (
     <div
+      ref={rootRef}
       className={cn(
-        "rounded-md border bg-white transition-all duration-200",
+        "rounded-md border bg-white transition-all duration-200 will-change-transform",
         isContainer ? "w-full h-full min-w-[320px] bg-slate-50/90" : "min-w-[240px] max-w-[280px]",
         // Base state
         isContainer ? "border-indigo-200" : "border-slate-200",
@@ -201,13 +194,17 @@ export const CustomNode = memo(({ data, selected }: CustomNodeProps) => {
         isTodo && !selected && !isContainer && "shadow-lg border-slate-300 scale-[1.02]",
         isDoing && !selected && "ring-2 ring-blue-400/50 shadow-lg border-blue-200",
         isDone && "opacity-60 shadow-none border-slate-100",
-        isContainer && "shadow-sm"
+        isContainer && "shadow-sm",
+        isDropTarget && "scale-[1.06] border-indigo-500 bg-indigo-50/95 shadow-2xl shadow-indigo-300/50 ring-4 ring-indigo-300/70 animate-pulse",
+        isDragging && "cursor-grabbing scale-[1.05] rotate-1 opacity-95 shadow-2xl shadow-sky-300/40 ring-2 ring-sky-300/80",
+        isDetachTarget && "rotate-[-1deg] border-amber-400 bg-amber-50/90 shadow-2xl shadow-amber-200/70 ring-4 ring-amber-300/80"
       )}
     >
       {/* Left Handle (Input) */}
       <Handle
         type="target"
         position={Position.Left}
+        style={handleStyle}
         className={cn(
           "!w-2 !h-4 !rounded-sm !bg-slate-300 hover:!bg-primary transition-colors border-none",
           isBlocked && "!bg-red-300"
@@ -215,146 +212,153 @@ export const CustomNode = memo(({ data, selected }: CustomNodeProps) => {
       />
 
       <div className={cn("p-3", isContainer && "h-full")}>
-        {isContainer && (
-          <div className="mb-2 flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-wide text-indigo-600">
-            <Layers className="h-3 w-3" />
-            <span>{childCount} inside</span>
-          </div>
-        )}
-
-        {/* 1. Header: Title & Status */}
-        <div className="flex items-start justify-between gap-2 mb-2">
-          {isEditingTitle ? (
-            <Input
-              value={editedTitle}
-              onChange={(e) => setEditedTitle(e.target.value)}
-              onBlur={handleTitleSave}
-              onKeyDown={(e) => e.key === "Enter" && handleTitleSave()}
-              autoFocus
-              className="h-6 text-sm font-semibold px-1 py-0"
-            />
-          ) : (
-            <h3
-              className="font-semibold text-sm text-slate-900 leading-snug cursor-text"
-              onDoubleClick={(e) => { e.stopPropagation(); setIsEditingTitle(true); }}
-            >
-              {node.title}
-            </h3>
-          )}
-
-          {/* Status (Subtle) */}
-          <Badge
-            variant="secondary"
-            className={cn(
-              "text-[9px] px-1.5 py-0 uppercase tracking-wide font-medium cursor-pointer select-none",
-              node.computedStatus === "DONE" && "bg-slate-100 text-slate-500 line-through",
-              node.computedStatus === "DOING" && "bg-blue-50 text-blue-600",
-              node.computedStatus === "WAITING" && "bg-yellow-50 text-yellow-600",
-              node.computedStatus === "BLOCKED" && "bg-red-50 text-red-600"
-            )}
-            onClick={handleStatusClick}
-          >
-            {node.computedStatus}
-          </Badge>
-        </div>
-
-        {/* 2. Owner (Clean, Neutral) */}
-        <div className="min-h-[24px] flex items-center mb-2">
-          {hasNoOwner ? (
-            // Calm Unassigned State
-            <div className="flex items-center gap-1.5 text-slate-400">
-              <div className="w-5 h-5 rounded-full border border-slate-200 bg-slate-50 flex items-center justify-center">
-                <User className="w-3 h-3 text-slate-300" />
-              </div>
-              <span className="text-[10px] text-slate-400 font-medium">Unassigned</span>
-              {/* Tiny Add Button */}
-              <DropdownMenu onOpenChange={(open) => { if (open && !hasLoadedMetadata) fetchMetadata(); }}>
-                <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                  <button className="ml-1 hover:bg-slate-100 p-0.5 rounded text-slate-400 opacity-50 hover:opacity-100 transition-opacity">
-                    <Plus className="w-3 h-3" />
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="start" className="w-56" onClick={(e) => e.stopPropagation()}>
-                  {members.length === 0 ? (
-                    <div className="text-xs text-slate-400 p-2 text-center">Loading...</div>
-                  ) : (
-                    members.map(m => (
-                      <DropdownMenuItem key={m.userId} onClick={() => updateNode({ ownerIds: [m.userId] })}>
-                        <span className="text-sm">{m.userName}</span>
-                      </DropdownMenuItem>
-                    ))
-                  )}
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-          ) : (
-            // Assigned Owner
-            <div className="flex items-center gap-2">
-              <Avatar className="h-5 w-5 border border-slate-100">
-                <AvatarFallback className="text-[9px] bg-indigo-50 text-indigo-700">
-                  {getInitials(primaryOwner.name)}
-                </AvatarFallback>
-              </Avatar>
-              <span className="text-[10px] font-medium text-slate-600 truncate max-w-[120px]">
-                {primaryOwner.name}
-              </span>
+        <div ref={collapsedContentRef}>
+          {isContainer && (
+            <div className="mb-2 flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-wide text-indigo-600">
+              <Layers className="h-3 w-3" />
+              <span>{childCount} inside</span>
             </div>
           )}
-        </div>
 
-        {/* Assigned Teams */}
-        {node.teams && node.teams.length > 0 && (
-          <div className="flex flex-wrap gap-1 mb-2">
-            {node.teams.map(team => (
-              <span
-                key={team.id}
-                className="text-[9px] px-1.5 py-0.5 bg-slate-100 text-slate-500 rounded"
+          {/* 1. Header: Title & Status */}
+          <div className="flex items-start justify-between gap-2 mb-2">
+            {isEditingTitle ? (
+              <Input
+                value={editedTitle}
+                onChange={(e) => setEditedTitle(e.target.value)}
+                onBlur={handleTitleSave}
+                onKeyDown={(e) => e.key === "Enter" && handleTitleSave()}
+                autoFocus
+                className="h-6 text-sm font-semibold px-1 py-0"
+              />
+            ) : (
+              <h3
+                className="font-semibold text-sm text-slate-900 leading-snug cursor-text"
+                onDoubleClick={(e) => { e.stopPropagation(); setIsEditingTitle(true); }}
               >
-                {team.name}
-              </span>
-            ))}
-          </div>
-        )}
+                {node.title}
+              </h3>
+            )}
 
-        {isContainer && (
-          <div className="mt-3 rounded border border-dashed border-indigo-200 bg-white/60 px-3 py-2 text-[10px] font-medium text-indigo-500">
-            Drop nodes here
+            {/* Status (Subtle) */}
+            <Badge
+              variant="secondary"
+              className={cn(
+                "text-[9px] px-1.5 py-0 uppercase tracking-wide font-medium cursor-pointer select-none",
+                node.computedStatus === "DONE" && "bg-slate-100 text-slate-500 line-through",
+                node.computedStatus === "DOING" && "bg-blue-50 text-blue-600",
+                node.computedStatus === "WAITING" && "bg-yellow-50 text-yellow-600",
+                node.computedStatus === "BLOCKED" && "bg-red-50 text-red-600"
+              )}
+              onClick={handleStatusClick}
+            >
+              {node.computedStatus}
+            </Badge>
           </div>
-        )}
 
-        <div className="flex items-center justify-between pt-2 border-t border-slate-50 mt-1">
-          <div className="flex items-center gap-2 text-slate-400">
-            {node.dueAt && (
-              <div className={cn("text-[9px] flex items-center gap-1",
-                new Date(node.dueAt) < new Date() ? "text-red-400" : "text-slate-400"
-              )}>
-                <Calendar className="w-2.5 h-2.5" />
-                <span>{new Date(node.dueAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span>
+          {/* 2. Owner (Clean, Neutral) */}
+          <div className="min-h-[24px] flex items-center mb-2">
+            {hasNoOwner ? (
+              // Calm Unassigned State
+              <div className="flex items-center gap-1.5 text-slate-400">
+                <div className="w-5 h-5 rounded-full border border-slate-200 bg-slate-50 flex items-center justify-center">
+                  <User className="w-3 h-3 text-slate-300" />
+                </div>
+                <span className="text-[10px] text-slate-400 font-medium">Unassigned</span>
+                {/* Tiny Add Button */}
+                <DropdownMenu onOpenChange={(open) => { if (open && !hasLoadedMetadata) fetchMetadata(); }}>
+                  <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                    <button className="ml-1 hover:bg-slate-100 p-0.5 rounded text-slate-400 opacity-50 hover:opacity-100 transition-opacity">
+                      <Plus className="w-3 h-3" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start" className="w-56" onClick={(e) => e.stopPropagation()}>
+                    {members.length === 0 ? (
+                      <div className="text-xs text-slate-400 p-2 text-center">Loading...</div>
+                    ) : (
+                      members.map(m => (
+                        <DropdownMenuItem key={m.userId} onClick={() => updateNode({ ownerIds: [m.userId] })}>
+                          <span className="text-sm">{m.userName}</span>
+                        </DropdownMenuItem>
+                      ))
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            ) : (
+              // Assigned Owner
+              <div className="flex items-center gap-2">
+                <Avatar className="h-5 w-5 border border-slate-100">
+                  <AvatarFallback className="text-[9px] bg-indigo-50 text-indigo-700">
+                    {getInitials(primaryOwner.name)}
+                  </AvatarFallback>
+                </Avatar>
+                <span className="text-[10px] font-medium text-slate-600 truncate max-w-[120px]">
+                  {primaryOwner.name}
+                </span>
               </div>
             )}
           </div>
 
-          {/* Blocked Count (if blocking others) */}
-          {(node.blocksCount || 0) > 0 && (
-            <div className="text-[9px] font-medium text-orange-600 bg-orange-50 px-1 rounded flex items-center gap-1">
-              <Ban className="w-2.5 h-2.5" />
-              {node.blocksCount}
+          {/* Assigned Teams */}
+          {node.teams && node.teams.length > 0 && (
+            <div className="flex flex-wrap gap-1 mb-2">
+              {node.teams.map(team => (
+                <span
+                  key={team.id}
+                  className="text-[9px] px-1.5 py-0.5 bg-slate-100 text-slate-500 rounded"
+                >
+                  {team.name}
+                </span>
+              ))}
             </div>
           )}
+
+          {isContainer && (
+            <div
+              className={cn(
+                "mt-3 rounded border border-dashed border-indigo-200 bg-white/60 px-3 py-2 text-[10px] font-medium text-indigo-500 transition-all duration-200",
+                isDropTarget && "border-indigo-500 bg-indigo-100 text-indigo-700 shadow-inner"
+              )}
+            >
+              Drop nodes here
+            </div>
+          )}
+
+          <div className="flex items-center justify-between pt-2 border-t border-slate-50 mt-1">
+            <div className="flex items-center gap-2 text-slate-400">
+              {node.dueAt && (
+                <div className={cn("text-[9px] flex items-center gap-1",
+                  new Date(node.dueAt) < new Date() ? "text-red-400" : "text-slate-400"
+                )}>
+                  <Calendar className="w-2.5 h-2.5" />
+                  <span>{new Date(node.dueAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span>
+                </div>
+              )}
+            </div>
+
+            {/* Blocked Count (if blocking others) */}
+            {(node.blocksCount || 0) > 0 && (
+              <div className="text-[9px] font-medium text-orange-600 bg-orange-50 px-1 rounded flex items-center gap-1">
+                <Ban className="w-2.5 h-2.5" />
+                {node.blocksCount}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* EXPANDED VIEW: Extra Controls when Selected */}
         {selected && (
-          <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between animate-in fade-in slide-in-from-top-1 duration-200">
+          <div className="mt-3 pt-3 border-t border-slate-100 flex items-start gap-2 animate-in fade-in slide-in-from-top-1 duration-200">
             {/* Contextual Action Button */}
-            <div className="flex gap-1">
+            <div className="flex min-w-0 flex-1 flex-wrap gap-1">
               {node.manualStatus === 'TODO' && (
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
                     updateNode({ manualStatus: 'DOING' });
                   }}
-                  className="nodrag px-3 py-1 text-[10px] font-semibold rounded bg-blue-500 text-white hover:bg-blue-600 transition-colors flex items-center gap-1"
+                  className="nodrag shrink-0 px-3 py-1 text-[10px] font-semibold rounded bg-blue-500 text-white hover:bg-blue-600 transition-colors flex items-center gap-1 whitespace-nowrap"
                 >
                   <PlayCircle className="w-3 h-3" />
                   Start
@@ -366,7 +370,7 @@ export const CustomNode = memo(({ data, selected }: CustomNodeProps) => {
                     e.stopPropagation();
                     updateNode({ manualStatus: 'DONE' });
                   }}
-                  className="nodrag px-3 py-1 text-[10px] font-semibold rounded bg-green-500 text-white hover:bg-green-600 transition-colors flex items-center gap-1"
+                  className="nodrag shrink-0 px-3 py-1 text-[10px] font-semibold rounded bg-green-500 text-white hover:bg-green-600 transition-colors flex items-center gap-1 whitespace-nowrap"
                 >
                   <CheckCircle2 className="w-3 h-3" />
                   Done
@@ -378,7 +382,7 @@ export const CustomNode = memo(({ data, selected }: CustomNodeProps) => {
                     e.stopPropagation();
                     updateNode({ manualStatus: 'TODO' });
                   }}
-                  className="nodrag px-3 py-1 text-[10px] font-medium rounded border border-slate-200 text-slate-500 hover:bg-slate-100 transition-colors flex items-center gap-1"
+                  className="nodrag shrink-0 px-3 py-1 text-[10px] font-medium rounded border border-slate-200 text-slate-500 hover:bg-slate-100 transition-colors flex items-center gap-1 whitespace-nowrap"
                 >
                   <Clock className="w-3 h-3" />
                   Reopen
@@ -391,24 +395,10 @@ export const CustomNode = memo(({ data, selected }: CustomNodeProps) => {
                   e.stopPropagation();
                   setCreateRequestOpen(true);
                 }}
-                className="nodrag px-2 py-1 text-[10px] font-medium rounded border border-slate-200 text-slate-500 hover:bg-slate-100 transition-colors flex items-center gap-1"
+                className="nodrag shrink-0 px-2 py-1 text-[10px] font-medium rounded border border-slate-200 text-slate-500 hover:bg-slate-100 transition-colors flex items-center gap-1 whitespace-nowrap"
               >
                 <MessageSquarePlus className="w-3 h-3" />
                 Request
-              </button>
-
-              {/* Analyze Button */}
-              <button
-                onClick={(e) => { e.stopPropagation(); analyzeBlock(); }}
-                disabled={isAnalyzing}
-                className="nodrag px-2 py-1 text-[10px] font-medium rounded border border-purple-200 text-purple-600 hover:bg-purple-50 transition-colors flex items-center gap-1 disabled:opacity-50"
-              >
-                {isAnalyzing ? (
-                  <Loader2 className="w-3 h-3 animate-spin" />
-                ) : (
-                  <Sparkles className="w-3 h-3" />
-                )}
-                Analyze
               </button>
 
               {/* Add Child Button */}
@@ -417,7 +407,7 @@ export const CustomNode = memo(({ data, selected }: CustomNodeProps) => {
                   e.stopPropagation();
                   onCreateChild?.();
                 }}
-                className="nodrag px-2 py-1 text-[10px] font-medium rounded border border-indigo-200 text-indigo-600 hover:bg-indigo-50 transition-colors flex items-center gap-1"
+                className="nodrag shrink-0 px-2 py-1 text-[10px] font-medium rounded border border-indigo-200 text-indigo-600 hover:bg-indigo-50 transition-colors flex items-center gap-1 whitespace-nowrap"
               >
                 <FolderPlus className="w-3 h-3" />
                 Inside
@@ -429,7 +419,7 @@ export const CustomNode = memo(({ data, selected }: CustomNodeProps) => {
                     e.stopPropagation();
                     onDetachFromParent?.();
                   }}
-                  className="nodrag px-2 py-1 text-[10px] font-medium rounded border border-slate-200 text-slate-500 hover:bg-slate-100 transition-colors flex items-center gap-1"
+                  className="nodrag shrink-0 px-2 py-1 text-[10px] font-medium rounded border border-slate-200 text-slate-500 hover:bg-slate-100 transition-colors flex items-center gap-1 whitespace-nowrap"
                 >
                   <CornerUpLeft className="w-3 h-3" />
                   Out
@@ -441,7 +431,9 @@ export const CustomNode = memo(({ data, selected }: CustomNodeProps) => {
             <Button
               variant="ghost"
               size="sm"
-              className="h-6 w-6 p-0 hover:bg-slate-100 text-slate-400 hover:text-indigo-600 rounded-full"
+              aria-label="Open task details"
+              title="Open task details"
+              className="h-6 w-6 shrink-0 p-0 hover:bg-slate-100 text-slate-400 hover:text-indigo-600 rounded-full"
               onClick={(e) => {
                 e.stopPropagation();
                 onOpenDetail?.();
@@ -452,64 +444,13 @@ export const CustomNode = memo(({ data, selected }: CustomNodeProps) => {
           </div>
         )}
 
-        {/* AI Analysis Popup */}
-        {showAnalysis && (
-          <div className="absolute z-50 top-full left-0 mt-2 w-72 bg-white rounded-lg shadow-xl border border-slate-200 p-3 text-xs">
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center gap-1.5 text-slate-700 font-semibold">
-                <Sparkles className="w-3.5 h-3.5 text-purple-500" />
-                AI Analysis
-              </div>
-              <button onClick={() => setShowAnalysis(false)} className="text-slate-400 hover:text-slate-600">
-                <X className="w-3.5 h-3.5" />
-              </button>
-            </div>
-
-            {analyzeError ? (
-              <div className="text-red-600 text-[11px]">{analyzeError}</div>
-            ) : aiAnalysis ? (
-              <div className="space-y-2">
-                {aiAnalysis.summary && (
-                  <p className="text-slate-600 leading-relaxed">{aiAnalysis.summary}</p>
-                )}
-
-                {blockingReasons.length > 0 && (
-                  <div>
-                    <div className="font-semibold text-slate-700 mb-1">Blocking:</div>
-                    <ul className="space-y-1">
-                      {blockingReasons.map((r, i) => (
-                        <li key={i} className="text-slate-600 bg-slate-50 px-2 py-1 rounded">
-                          <span className="font-medium">{r.targetTitle}</span>: {r.actionNeeded}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-
-                {suggestedActors.length > 0 && (
-                  <div>
-                    <div className="font-semibold text-slate-700 mb-1">Who should act:</div>
-                    <ul className="space-y-1">
-                      {suggestedActors.map((w, i) => (
-                        <li key={i} className="text-slate-600">
-                          <span className="font-medium">{w.name}</span>: {w.nextStep}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="text-slate-400">Loading...</div>
-            )}
-          </div>
-        )}
       </div>
 
       {/* Right Handle (Output) */}
       <Handle
         type="source"
         position={Position.Right}
+        style={handleStyle}
         className={cn(
           "!w-2 !h-4 !rounded-sm !bg-slate-300 hover:!bg-primary transition-colors border-none",
           isBlocked && "!bg-red-300"

@@ -20,6 +20,8 @@ const CreateNodeSchema = z.object({
   team: z.string().optional().nullable(),
   teamIds: z.array(z.string()).optional(),
   priority: z.number().int().min(1).max(5).default(3),
+  positionX: z.number().optional(),
+  positionY: z.number().optional(),
   dueAt: z.string().datetime().optional().nullable(),
   phase: z.string().optional().nullable(),
 });
@@ -85,10 +87,8 @@ export async function POST(
     const ownerId = (validated.ownerId && validated.ownerId !== "unassigned") ? validated.ownerId : null;
     const teamId = (validated.team && validated.team !== "none") ? validated.team : null;
 
-    // Generate random initial position to prevent stacking
-    // Spread nodes in a 800x600 area
-    const initialX = Math.random() * 800;
-    const initialY = Math.random() * 600;
+    const initialX = validated.positionX ?? Math.random() * 800;
+    const initialY = validated.positionY ?? Math.random() * 600;
 
     // Use transaction to create node and increment nodeCount atomically
     const node = await prisma.$transaction(async (tx) => {

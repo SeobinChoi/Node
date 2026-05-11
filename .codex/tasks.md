@@ -1,5 +1,25 @@
 # Tasks
 
+- [x] Improve mobile dashboard UI with a top app bar, drawer navigation, and responsive workspace/project/graph/settings/inbox surfaces.
+- [ ] Deploy the root login/main redirect fix to Vercel production after explicit approval to ship the current dirty worktree, or after preparing an isolated deploy scope.
+- [ ] Deploy the closed-state graph handle anchor fix after confirming whether the completed Analyze removal should ship in the same production deploy.
+- [x] Improve nested-node drag-in/out UX with live animated drop targets and outside-parent detach.
+- [x] Remove the root `No workspaces yet` fallback by creating a personal workspace for authenticated users without one and redirecting them to projects.
+- [x] Fix graph edge handles to stay at the closed-node vertical center when nodes expand.
+- [x] Remove the node Analyze feature.
+- [x] Keep inbox notifications visible after marking them read and deploy to Vercel production.
+- [x] Fix individual inbox notification mark-as-read action and deploy to Vercel production.
+- [x] Add one-click mark-all-read for visible inbox notifications.
+- [x] Keep graph edge handles fixed when selected nodes expand.
+- [x] Create context-menu nodes at the clicked canvas position and deploy to Vercel production.
+- [x] Deploy current graph UI changes to Vercel production.
+- [x] Remove graph delete confirmation dialogs and add Ctrl/Cmd+Z restore.
+- [x] Change graph connection lines from right-angled smoothstep paths to sigmoid-like curves.
+- [x] Deploy current graph UI fixes to Vercel production.
+- [x] Keep selected graph node action buttons inside the node card.
+- [x] Re-fix graph keyboard Delete persistence and move saved status to the true top-left.
+- [x] Persist graph keyboard Delete/Backspace removals and show top-left saved status
+- [x] Fix node deletion from the page so the UI reflects deleted nodes immediately and consistently
 - [x] Generate root `AGENTS.md` contributor guide
 - [x] Install Supabase SSR dependencies and add Supabase client helpers, middleware, and example route
 - [x] Decide whether to archive or remove root documentation files

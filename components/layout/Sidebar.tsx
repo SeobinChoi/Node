@@ -45,6 +45,8 @@ interface Workspace {
 
 interface SidebarProps {
   currentOrgId: string;
+  variant?: "desktop" | "mobile";
+  onNavigate?: () => void;
 }
 
 interface NavItemProps {
@@ -55,7 +57,7 @@ interface NavItemProps {
   count?: number;
 }
 
-export function Sidebar({ currentOrgId }: SidebarProps) {
+export function Sidebar({ currentOrgId, variant = "desktop", onNavigate }: SidebarProps) {
   const { data: session } = useSession();
   const pathname = usePathname();
   const router = useRouter();
@@ -330,6 +332,7 @@ export function Sidebar({ currentOrgId }: SidebarProps) {
   const NavItem = ({ href, icon: Icon, label, active, count }: NavItemProps) => (
     <Link
       href={href}
+      onClick={onNavigate}
       className={cn(
         "flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-md transition-colors",
         active
@@ -347,8 +350,16 @@ export function Sidebar({ currentOrgId }: SidebarProps) {
     </Link>
   );
 
+  const isMobile = variant === "mobile";
+
   return (
-    <div className="relative flex h-screen flex-col border-r border-[#2c2d31] bg-[#1a1b1e]" style={{ width: `${sidebarWidth}px` }}>
+    <div
+      className={cn(
+        "relative flex flex-col bg-[#1a1b1e]",
+        isMobile ? "h-full w-full" : "h-screen border-r border-[#2c2d31]"
+      )}
+      style={isMobile ? undefined : { width: `${sidebarWidth}px` }}
+    >
       {/* Workspace Header */}
       <div className="h-14 flex items-center px-4 border-b border-[#2c2d31]">
         <DropdownMenu>
@@ -382,6 +393,7 @@ export function Sidebar({ currentOrgId }: SidebarProps) {
                   } else if (pathname?.includes("/home")) {
                     targetPath = `/org/${w.orgId}/home`;
                   }
+                  onNavigate?.();
                   router.push(targetPath);
                 }}
                 className="gap-2 focus:bg-[#2c2d31] focus:text-white cursor-pointer"
@@ -448,7 +460,10 @@ export function Sidebar({ currentOrgId }: SidebarProps) {
                   variant="ghost"
                   size="icon"
                   className="h-4 w-4 text-[#6b7280] hover:text-[#e5e7eb] hover:bg-transparent"
-                  onClick={() => router.push(`/org/${currentOrgId}/projects/new`)}
+                  onClick={() => {
+                    onNavigate?.();
+                    router.push(`/org/${currentOrgId}/projects/new`);
+                  }}
                 >
                   <Plus className="h-3 w-3" />
                 </Button>
@@ -499,6 +514,7 @@ export function Sidebar({ currentOrgId }: SidebarProps) {
                               orgId={currentOrgId}
                               onCreateSubFolder={openCreateFolderModal}
                               index={index}
+                              onNavigate={onNavigate}
                             />
                           ))}
                           {provided.placeholder}
@@ -520,6 +536,7 @@ export function Sidebar({ currentOrgId }: SidebarProps) {
                               orgId={currentOrgId}
                               level={0}
                               index={index}
+                              onNavigate={onNavigate}
                             />
                           ))}
                           {provided.placeholder}
@@ -569,12 +586,16 @@ export function Sidebar({ currentOrgId }: SidebarProps) {
             <DropdownMenuItem
               className="gap-2 focus:bg-[#2c2d31] focus:text-white cursor-pointer"
               onClick={() => router.push("/settings/profile")}
+              onSelect={onNavigate}
             >
               <UserCircle2 className="h-4 w-4" /> Profile
             </DropdownMenuItem>
             <DropdownMenuItem
               className="gap-2 focus:bg-[#2c2d31] focus:text-white cursor-pointer"
-              onClick={() => router.push(`/org/${currentOrgId}/settings`)}
+              onClick={() => {
+                onNavigate?.();
+                router.push(`/org/${currentOrgId}/settings`);
+              }}
             >
               <Settings className="h-4 w-4" /> Workspace Settings
             </DropdownMenuItem>
@@ -603,18 +624,20 @@ export function Sidebar({ currentOrgId }: SidebarProps) {
       />
 
       {/* Resize Handle */}
-      <div
-        className={cn(
-          "absolute top-0 right-0 bottom-0 w-1 cursor-ew-resize hover:bg-blue-500/50 transition-colors group",
-          isResizing && "bg-blue-500"
-        )}
-        onMouseDown={(e) => {
-          e.preventDefault();
-          setIsResizing(true);
-        }}
-      >
-        <div className="absolute top-1/2 right-0 -translate-y-1/2 w-1 h-12 bg-slate-600 rounded-l opacity-0 group-hover:opacity-100 transition-opacity" />
-      </div>
+      {!isMobile && (
+        <div
+          className={cn(
+            "absolute top-0 right-0 bottom-0 w-1 cursor-ew-resize hover:bg-blue-500/50 transition-colors group",
+            isResizing && "bg-blue-500"
+          )}
+          onMouseDown={(e) => {
+            e.preventDefault();
+            setIsResizing(true);
+          }}
+        >
+          <div className="absolute top-1/2 right-0 -translate-y-1/2 w-1 h-12 bg-slate-600 rounded-l opacity-0 group-hover:opacity-100 transition-opacity" />
+        </div>
+      )}
     </div>
   );
 }

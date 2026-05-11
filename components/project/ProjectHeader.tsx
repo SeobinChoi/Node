@@ -96,7 +96,7 @@ export function ProjectHeader({
 
     return (
         <>
-            <div className="sticky top-0 z-50 flex items-center justify-between gap-4 px-6 py-2 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/95">
+            <div className="sticky top-0 z-50 flex min-h-12 items-center justify-between gap-2 border-b border-border bg-background/95 px-3 py-2 backdrop-blur supports-[backdrop-filter]:bg-background/95 sm:gap-4 sm:px-6">
                 {/* Project Name - Editable */}
                 {isEditing ? (
                     <Input
@@ -110,24 +110,24 @@ export function ProjectHeader({
                                 setEditName(projectName);
                             }
                         }}
-                        className="h-8 text-lg font-semibold max-w-xs bg-background border-primary"
+                        className="h-8 min-w-0 max-w-[48vw] bg-background text-base font-semibold border-primary sm:max-w-xs sm:text-lg"
                         autoFocus
                     />
                 ) : (
                     <div
-                        className="flex items-center gap-2 group cursor-pointer"
+                        className="group flex min-w-0 flex-1 cursor-pointer items-center gap-2"
                         onClick={() => setIsEditing(true)}
                         title="Click to edit"
                     >
-                        <h1 className="text-lg font-semibold text-foreground truncate">{projectName}</h1>
-                        <Pencil className="h-3.5 w-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                        <h1 className="min-w-0 truncate text-base font-semibold text-foreground sm:text-lg">{projectName}</h1>
+                        <Pencil className="h-3.5 w-3.5 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
                     </div>
                 )}
 
                 {/* Right side actions */}
-                <div className="flex items-center gap-2">
+                <div className="flex shrink-0 items-center gap-1 sm:gap-2">
                     {/* Collaborators */}
-                    <div className="flex items-center -space-x-2">
+                    <div className="hidden items-center -space-x-2 sm:flex">
                         {displayCollaborators.slice(0, 3).map((collaborator) => (
                             <Avatar
                                 key={collaborator.id}
@@ -155,8 +155,8 @@ export function ProjectHeader({
                         title="Share project"
                         onClick={() => setShareOpen(true)}
                     >
-                        <Share2 className="h-4 w-4 mr-1.5" />
-                        <span className="text-sm font-medium">Share</span>
+                        <Share2 className="h-4 w-4 sm:mr-1.5" />
+                        <span className="hidden text-sm font-medium sm:inline">Share</span>
                     </Button>
 
                     {/* Favorite Toggle */}

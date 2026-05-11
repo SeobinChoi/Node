@@ -3,14 +3,18 @@
 import { useCallback, useMemo, useState } from "react";
 import { NodeDTO, EdgeDTO } from "@/types";
 import { cn } from "@/lib/utils";
-import { CheckCircle2, Clock, Ban, ChevronDown, ChevronRight, Zap } from "lucide-react";
+import { AlertCircle, CheckCircle2, Clock, Ban, ChevronDown, ChevronRight, Loader2, Zap } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+
+type SaveStatus = "saved" | "saving" | "error";
 
 interface ActionCenterBarProps {
     nodes: NodeDTO[];
     edges: EdgeDTO[];
     userId: string;
     onNodeClick?: (nodeId: string) => void;
+    saveStatus?: SaveStatus;
+    lastSavedAt?: Date | null;
 }
 
 interface ActionCategory {
@@ -22,7 +26,14 @@ interface ActionCategory {
     items: NodeDTO[];
 }
 
-export function ActionCenterBar({ nodes, edges, userId, onNodeClick }: ActionCenterBarProps) {
+export function ActionCenterBar({
+    nodes,
+    edges,
+    userId,
+    onNodeClick,
+    saveStatus = "saved",
+    lastSavedAt,
+}: ActionCenterBarProps) {
     const [expandedCategory, setExpandedCategory] = useState<string | null>(null);
 
     const isOwner = useCallback((node: NodeDTO) => {
@@ -95,6 +106,9 @@ export function ActionCenterBar({ nodes, edges, userId, onNodeClick }: ActionCen
     ];
 
     const totalActions = actionable.length + waiting.length + blocking.length;
+    const saveStatusTitle = lastSavedAt
+        ? `Last saved ${lastSavedAt.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`
+        : "All graph changes are saved";
 
     const toggleCategory = (id: string) => {
         setExpandedCategory(expandedCategory === id ? null : id);
@@ -103,10 +117,40 @@ export function ActionCenterBar({ nodes, edges, userId, onNodeClick }: ActionCen
     return (
         <div className="bg-gradient-to-r from-slate-50 to-white border-b border-slate-200 shadow-sm">
             {/* Compact Header Row */}
-            <div className="px-4 py-3 flex items-center gap-4">
-                <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2 px-3 py-2 sm:gap-4 sm:px-4 sm:py-3">
+                <div
+                    data-testid="save-status"
+                    className={cn(
+                        "flex h-7 min-w-[88px] items-center gap-1.5 rounded-md px-2 text-xs font-medium",
+                        saveStatus === "saving" && "bg-blue-50 text-blue-700",
+                        saveStatus === "saved" && "text-slate-500",
+                        saveStatus === "error" && "bg-red-50 text-red-600"
+                    )}
+                    title={saveStatus === "saved" ? saveStatusTitle : undefined}
+                    aria-label={`Save status: ${saveStatus === "saving" ? "Saving" : saveStatus === "error" ? "Save failed" : "Saved"}`}
+                    aria-live="polite"
+                >
+                    {saveStatus === "saving" ? (
+                        <>
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            <span>Saving...</span>
+                        </>
+                    ) : saveStatus === "error" ? (
+                        <>
+                            <AlertCircle className="h-3.5 w-3.5" />
+                            <span>Save failed</span>
+                        </>
+                    ) : (
+                        <>
+                            <CheckCircle2 className="h-3.5 w-3.5" />
+                            <span>Saved</span>
+                        </>
+                    )}
+                </div>
+
+                <div className="flex min-w-0 items-center gap-2">
                     <Zap className="h-4 w-4 text-orange-500" />
-                    <span className="font-semibold text-sm text-slate-800">Action Center</span>
+                    <span className="truncate text-sm font-semibold text-slate-800">Action Center</span>
                     {totalActions > 0 && (
                         <Badge variant="secondary" className="text-[10px] px-1.5 py-0 bg-orange-100 text-orange-700">
                             {totalActions}
@@ -115,13 +159,13 @@ export function ActionCenterBar({ nodes, edges, userId, onNodeClick }: ActionCen
                 </div>
 
                 {/* Category Buttons */}
-                <div className="flex items-center gap-2">
+                <div className="-mx-1 flex min-w-full gap-1 overflow-x-auto px-1 sm:min-w-0 sm:gap-2 sm:overflow-visible">
                     {categories.map((cat) => (
                         <button
                             key={cat.id}
                             onClick={() => toggleCategory(cat.id)}
                             className={cn(
-                                "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all",
+                                "flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-all sm:px-3",
                                 expandedCategory === cat.id
                                     ? "bg-slate-200 text-slate-900"
                                     : "hover:bg-slate-100 text-slate-600"
@@ -146,7 +190,7 @@ export function ActionCenterBar({ nodes, edges, userId, onNodeClick }: ActionCen
 
             {/* Expanded Category Content */}
             {expandedCategory && (
-                <div className="px-4 pb-3">
+                <div className="px-3 pb-3 sm:px-4">
                     <div className="bg-white rounded-lg border border-slate-200 shadow-inner max-h-[200px] overflow-y-auto">
                         {categories
                             .find((c) => c.id === expandedCategory)

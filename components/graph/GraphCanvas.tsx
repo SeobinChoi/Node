@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState, useEffect } from "react";
+import { useCallback, useMemo, useRef, useState, useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import ReactFlow, {
   Node,
@@ -9,9 +9,11 @@ import ReactFlow, {
   useNodesState,
   useEdgesState,
   Connection,
+  ConnectionLineType,
   MarkerType,
   NodeDragHandler,
   Position,
+  type ReactFlowInstance,
 } from "reactflow";
 import dagre from "dagre";
 import "reactflow/dist/style.css";
@@ -22,6 +24,7 @@ import { Toolbar } from "./Toolbar";
 import { CanvasContextMenu, ContextMenuPosition } from "./CanvasContextMenu";
 import { AddNodeDialog } from "./AddNodeDialog";
 import { NodeDetailSheet } from "./NodeDetailSheet";
+import { useDeleteNode } from "@/hooks/use-node-mutations";
 import { useSession } from "next-auth/react";
 import {
   Dialog,
@@ -49,6 +52,21 @@ interface GraphCanvasProps {
   focusNodeId?: string | null;
 }
 
+type SaveStatus = "saved" | "saving" | "error";
+
+interface DeletedGraphSnapshot {
+  nodes: NodeDTO[];
+  edges: EdgeDTO[];
+  childParentRestores: Array<{ nodeId: string; parentNodeId: string }>;
+  label: string;
+}
+
+interface DragHierarchyFeedback {
+  draggingNodeId: string | null;
+  dropTargetNodeId: string | null;
+  isDetaching: boolean;
+}
+
 const nodeTypes = {
   custom: CustomNode,
 };
@@ -59,6 +77,16 @@ const containerMinWidth = 340;
 const containerMinHeight = 190;
 const containerPadding = 32;
 const containerHeaderHeight = 76;
+const hierarchyDropPadding = 28;
+const hierarchyDropOverlapRatio = 0.24;
+const hierarchyDetachOverlapRatio = 0.45;
+const graphEdgeStyle = {
+  strokeWidth: 2,
+  stroke: "#94a3b8",
+};
+const graphEdgePathOptions = {
+  curvature: 0.45,
+};
 
 function getNodeDepth(node: NodeDTO, nodeById: Map<string, NodeDTO>) {
   let depth = 0;
@@ -116,6 +144,167 @@ function getAbsoluteNodePosition(flowNode: Node, allNodes: Node[]) {
   return { x, y };
 }
 
+function getFlowNodeRect(flowNode: Node, allNodes: Node[]) {
+  const position = getAbsoluteNodePosition(flowNode, allNodes);
+  const dimensions = getFlowNodeDimensions(flowNode);
+
+  return {
+    x: position.x,
+    y: position.y,
+    width: dimensions.width,
+    height: dimensions.height,
+  };
+}
+
+function getRectIntersectionArea(
+  a: { x: number; y: number; width: number; height: number },
+  b: { x: number; y: number; width: number; height: number }
+) {
+  const width = Math.max(0, Math.min(a.x + a.width, b.x + b.width) - Math.max(a.x, b.x));
+  const height = Math.max(0, Math.min(a.y + a.height, b.y + b.height) - Math.max(a.y, b.y));
+  return width * height;
+}
+
+function isPointInsideRect(
+  point: { x: number; y: number },
+  rect: { x: number; y: number; width: number; height: number },
+  padding = 0
+) {
+  return (
+    point.x >= rect.x - padding &&
+    point.x <= rect.x + rect.width + padding &&
+    point.y >= rect.y - padding &&
+    point.y <= rect.y + rect.height + padding
+  );
+}
+
+function getNodeCenter(rect: { x: number; y: number; width: number; height: number }) {
+  return {
+    x: rect.x + rect.width / 2,
+    y: rect.y + rect.height / 2,
+  };
+}
+
+function findHierarchyDropTarget(draggedNode: Node, allNodes: Node[], nodeById: Map<string, NodeDTO>) {
+  const draggedDto = nodeById.get(draggedNode.id);
+  if (!draggedDto) return null;
+
+  const draggedRect = getFlowNodeRect(draggedNode, allNodes);
+  const draggedArea = Math.max(1, draggedRect.width * draggedRect.height);
+  const draggedCenter = getNodeCenter(draggedRect);
+
+  return allNodes
+    .filter((candidate) => {
+      if (candidate.id === draggedNode.id) return false;
+      if (isDescendantOf(candidate.id, draggedNode.id, nodeById)) return false;
+      return nodeById.has(candidate.id);
+    })
+    .map((candidate) => {
+      const candidateDto = nodeById.get(candidate.id);
+      if (!candidateDto) return null;
+
+      const candidateRect = getFlowNodeRect(candidate, allNodes);
+      const candidateArea = Math.max(1, candidateRect.width * candidateRect.height);
+      const intersectionArea = getRectIntersectionArea(draggedRect, candidateRect);
+      const overlapRatio = intersectionArea / Math.min(draggedArea, candidateArea);
+      const centerInside = isPointInsideRect(draggedCenter, candidateRect, hierarchyDropPadding);
+
+      if (!centerInside && overlapRatio < hierarchyDropOverlapRatio) return null;
+
+      return {
+        node: candidate,
+        score:
+          getNodeDepth(candidateDto, nodeById) * 100000 +
+          overlapRatio * 1000 +
+          (centerInside ? 100 : 0),
+      };
+    })
+    .filter((candidate): candidate is { node: Node; score: number } => Boolean(candidate))
+    .sort((a, b) => b.score - a.score)[0]?.node ?? null;
+}
+
+function isDraggedNodeOutsideParent(draggedNode: Node, allNodes: Node[]) {
+  if (!draggedNode.parentNode) return false;
+
+  const parentNode = allNodes.find((candidate) => candidate.id === draggedNode.parentNode);
+  if (!parentNode) return false;
+
+  const draggedRect = getFlowNodeRect(draggedNode, allNodes);
+  const parentRect = getFlowNodeRect(parentNode, allNodes);
+  const draggedArea = Math.max(1, draggedRect.width * draggedRect.height);
+  const draggedCenter = getNodeCenter(draggedRect);
+  const overlapRatio = getRectIntersectionArea(draggedRect, parentRect) / draggedArea;
+
+  return !isPointInsideRect(draggedCenter, parentRect) && overlapRatio < hierarchyDetachOverlapRatio;
+}
+
+function updateNodeFrameInGraphData(
+  graphData: GraphData,
+  nodeId: string,
+  parentNodeId: string | null,
+  position: { x: number; y: number }
+) {
+  const previousParentId = graphData.nodes.find((node) => node.id === nodeId)?.parentNodeId ?? null;
+  const parentChanged = previousParentId !== parentNodeId;
+
+  return {
+    ...graphData,
+    nodes: graphData.nodes.map((node) => {
+      if (node.id === nodeId) {
+        return {
+          ...node,
+          parentNodeId,
+          positionX: Math.round(position.x),
+          positionY: Math.round(position.y),
+        };
+      }
+
+      if (parentChanged && previousParentId && node.id === previousParentId) {
+        return { ...node, childCount: Math.max(0, (node.childCount || 0) - 1) };
+      }
+
+      if (parentChanged && parentNodeId && node.id === parentNodeId) {
+        return { ...node, childCount: (node.childCount || 0) + 1 };
+      }
+
+      return node;
+    }),
+  };
+}
+
+function shouldIgnoreGraphDeleteKey(target: EventTarget | null) {
+  if (!(target instanceof Element)) return false;
+  return Boolean(
+    target.closest(
+      'input, textarea, select, button, [contenteditable="true"], [role="textbox"], [role="dialog"]'
+    )
+  );
+}
+
+function restoreGraphData(graphData: GraphData, snapshot: DeletedGraphSnapshot): GraphData {
+  const nodeById = new Map(graphData.nodes.map((node) => [node.id, node]));
+  const edgeById = new Map(graphData.edges.map((edge) => [edge.id, edge]));
+
+  snapshot.nodes.forEach((node) => {
+    nodeById.set(node.id, node);
+  });
+
+  snapshot.childParentRestores.forEach(({ nodeId, parentNodeId }) => {
+    const node = nodeById.get(nodeId);
+    if (node) nodeById.set(nodeId, { ...node, parentNodeId });
+  });
+
+  snapshot.edges.forEach((edge) => {
+    edgeById.set(edge.id, edge);
+  });
+
+  return {
+    ...graphData,
+    nodes: Array.from(nodeById.values()),
+    edges: Array.from(edgeById.values()),
+  };
+}
+
 async function persistNodeFrame(nodeId: string, parentNodeId: string | null, x: number, y: number) {
   const res = await fetch(`/api/nodes/${nodeId}`, {
     method: "PATCH",
@@ -128,6 +317,7 @@ async function persistNodeFrame(nodeId: string, parentNodeId: string | null, x: 
   });
 
   if (!res.ok) {
+    if (res.status === 404) return;
     const errorData = await res.json().catch(() => ({}));
     throw new Error(errorData.error || `Failed to save node (${res.status})`);
   }
@@ -188,12 +378,53 @@ export function GraphCanvas({ projectId, orgId, data, onDataChange, focusNodeId 
   const [contextMenu, setContextMenu] = useState<ContextMenuPosition | null>(null);
   const [addNodeOpen, setAddNodeOpen] = useState(false);
   const [addNodeParent, setAddNodeParent] = useState<{ id: string; title: string } | null>(null);
+  const [addNodePosition, setAddNodePosition] = useState<{ x: number; y: number } | null>(null);
   const [pendingDetachNodeId, setPendingDetachNodeId] = useState<string | null>(null);
   const [pendingSaveCount, setPendingSaveCount] = useState(0);
+  const [hasSaveError, setHasSaveError] = useState(false);
+  const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
   const [layoutDirection] = useState<"LR" | "TB">("LR");
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [isSheetOpen, setIsSheetOpen] = useState(false);
+  const [dragHierarchyFeedback, setDragHierarchyFeedback] = useState<DragHierarchyFeedback>({
+    draggingNodeId: null,
+    dropTargetNodeId: null,
+    isDetaching: false,
+  });
+  const selectedNodeIdRef = useRef<string | null>(null);
+  const deletedGraphSnapshotRef = useRef<DeletedGraphSnapshot | null>(null);
+  const reactFlowInstanceRef = useRef<ReactFlowInstance | null>(null);
   const queryClient = useQueryClient();
+  const deleteNodeMutation = useDeleteNode();
+  const { data: session } = useSession();
+  const saveStatus: SaveStatus = pendingSaveCount > 0 ? "saving" : hasSaveError ? "error" : "saved";
+
+  const beginSaving = useCallback(() => {
+    setHasSaveError(false);
+    setPendingSaveCount((count) => count + 1);
+  }, []);
+
+  const finishSaving = useCallback((succeeded: boolean) => {
+    if (succeeded) {
+      setLastSavedAt(new Date());
+    } else {
+      setHasSaveError(true);
+    }
+    setPendingSaveCount((count) => Math.max(0, count - 1));
+  }, []);
+
+  const changePendingSaveCount = useCallback((delta: number) => {
+    if (delta > 0) {
+      setHasSaveError(false);
+      setPendingSaveCount((count) => count + delta);
+      return;
+    }
+
+    if (delta < 0) {
+      setLastSavedAt(new Date());
+      setPendingSaveCount((count) => Math.max(0, count + delta));
+    }
+  }, []);
 
   const { layoutedNodes, layoutedEdges } = useMemo(() => {
     const nodeById = new Map(data.nodes.map((node) => [node.id, node]));
@@ -253,7 +484,6 @@ export function GraphCanvas({ projectId, orgId, data, onDataChange, focusNodeId 
         type: "custom",
         position: { x, y },
         parentNode: node.parentNodeId || undefined,
-        extent: node.parentNodeId ? "parent" : undefined,
         draggable: true,
         zIndex: node.parentNodeId ? 20 + getNodeDepth(node, nodeById) : 0,
         style: childCount > 0 && dimensions
@@ -275,17 +505,14 @@ export function GraphCanvas({ projectId, orgId, data, onDataChange, focusNodeId 
           id: edge.id,
           source: isForward ? edge.fromNodeId : edge.toNodeId,
           target: isForward ? edge.toNodeId : edge.fromNodeId,
-          type: "smoothstep",
+          type: "default",
           label: edge.relation.replace(/_/g, " "),
-          pathOptions: { borderRadius: 12 },
+          pathOptions: graphEdgePathOptions,
           markerEnd: {
             type: MarkerType.ArrowClosed,
             color: "#64748b",
           },
-          style: {
-            strokeWidth: 2,
-            stroke: "#94a3b8",
-          },
+          style: graphEdgeStyle,
           data: { originalEdge: edge },
         };
       });
@@ -375,17 +602,20 @@ export function GraphCanvas({ projectId, orgId, data, onDataChange, focusNodeId 
           blockedBy: blockedByTitles,
           blocking: blockingTitles,
           onOpenDetail: () => {
+            selectedNodeIdRef.current = node.id;
             setSelectedNodeId(node.id);
             setIsSheetOpen(true);
           },
           onCreateChild: () => {
             const sourceNode = data.nodes.find((n) => n.id === node.id);
             setAddNodeParent({ id: node.id, title: sourceNode?.title || "selected node" });
+            setAddNodePosition(null);
             setAddNodeOpen(true);
           },
           onDetachFromParent: () => {
             setPendingDetachNodeId(node.id);
           },
+          onPendingSaveChange: changePendingSaveCount,
         },
       };
     });
@@ -399,14 +629,68 @@ export function GraphCanvas({ projectId, orgId, data, onDataChange, focusNodeId 
       }),
       layoutedEdges: edges,
     };
-  }, [data.nodes, data.edges, filterStatus, searchQuery, selectedTeamIds, selectedUserIds, projectId, orgId, onDataChange, layoutDirection]);
+  }, [changePendingSaveCount, data.nodes, data.edges, filterStatus, searchQuery, selectedTeamIds, selectedUserIds, projectId, orgId, onDataChange, layoutDirection]);
 
   const [nodes, setNodes, onNodesChange] = useNodesState(layoutedNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(layoutedEdges);
+  const visibleNodes = useMemo(
+    () =>
+      nodes.map((node) => {
+        const isDragging = dragHierarchyFeedback.draggingNodeId === node.id;
+        const isDropTarget = dragHierarchyFeedback.dropTargetNodeId === node.id;
 
-  const changePendingSaveCount = useCallback((delta: number) => {
-    setPendingSaveCount((count) => Math.max(0, count + delta));
-  }, []);
+        return {
+          ...node,
+          zIndex: isDragging ? 1000 : isDropTarget ? 900 : node.zIndex,
+          data: {
+            ...node.data,
+            isDragging,
+            isDropTarget,
+            isDetachTarget: isDragging && dragHierarchyFeedback.isDetaching,
+          },
+        };
+      }),
+    [dragHierarchyFeedback, nodes]
+  );
+
+  const selectOnlyNode = useCallback(
+    (nodeId: string) => {
+      selectedNodeIdRef.current = nodeId;
+      setSelectedNodeId(nodeId);
+      setIsSheetOpen(false);
+      setNodes((currentNodes) =>
+        currentNodes.map((node) => ({
+          ...node,
+          selected: node.id === nodeId,
+        }))
+      );
+      setEdges((currentEdges) =>
+        currentEdges.map((edge) => ({
+          ...edge,
+          selected: false,
+        }))
+      );
+    },
+    [setEdges, setNodes]
+  );
+
+  const clearSelection = useCallback(() => {
+    selectedNodeIdRef.current = null;
+    setSelectedNodeId(null);
+    setIsSheetOpen(false);
+    setNodes((currentNodes) =>
+      currentNodes.map((node) => ({
+        ...node,
+        selected: false,
+      }))
+    );
+    setEdges((currentEdges) =>
+      currentEdges.map((edge) => ({
+        ...edge,
+        selected: false,
+      }))
+    );
+  }, [setEdges, setNodes]);
 
   useEffect(() => {
     if (pendingSaveCount === 0) return;
@@ -454,26 +738,33 @@ export function GraphCanvas({ projectId, orgId, data, onDataChange, focusNodeId 
 
     queryClient.setQueryData<GraphData>(["graph", projectId], (old: GraphData | undefined) => {
       if (!old) return old;
-      return {
-        ...old,
-        nodes: old.nodes.map((node) =>
-          node.id === flowNode.id
-            ? { ...node, parentNodeId: null, positionX: Math.round(nextX), positionY: Math.round(nextY) }
-            : node
-        ),
-      };
+      return updateNodeFrameInGraphData(old, flowNode.id, null, { x: nextX, y: nextY });
     });
+    setNodes((currentNodes) =>
+      currentNodes.map((node) =>
+        node.id === flowNode.id
+          ? {
+            ...node,
+            parentNode: undefined,
+            position: { x: nextX, y: nextY },
+          }
+          : node
+      )
+    );
 
+    beginSaving();
     void persistNodeFrame(flowNode.id, null, nextX, nextY)
       .then(() => {
         toast.success("Node moved out");
         onDataChange();
+        finishSaving(true);
       })
       .catch((error) => {
         toast.error(error instanceof Error ? error.message : "Failed to move node");
         onDataChange();
+        finishSaving(false);
       });
-  }, [nodes, onDataChange, pendingDetachNodeId, projectId, queryClient]);
+  }, [beginSaving, finishSaving, nodes, onDataChange, pendingDetachNodeId, projectId, queryClient, setNodes]);
 
   // Focus on specific node when focusNodeId is provided
   useEffect(() => {
@@ -487,7 +778,7 @@ export function GraphCanvas({ projectId, orgId, data, onDataChange, focusNodeId 
     }
   }, [focusNodeId, setNodes]);
 
-  useMemo(() => {
+  useEffect(() => {
     setNodes((nds) =>
       layoutedNodes.map((newNode) => {
         const existingNode = nds.find((n) => n.id === newNode.id);
@@ -520,7 +811,8 @@ export function GraphCanvas({ projectId, orgId, data, onDataChange, focusNodeId 
       createdAt: new Date().toISOString(),
     };
 
-    changePendingSaveCount(1);
+    let succeeded = false;
+    beginSaving();
     queryClient.setQueryData<GraphData>(["graph", projectId], (old) => {
       if (!old) return old;
       return {
@@ -556,6 +848,7 @@ export function GraphCanvas({ projectId, orgId, data, onDataChange, focusNodeId 
       });
       toast.success("Connection saved");
       onDataChange();
+      succeeded = true;
     } catch (error) {
       queryClient.setQueryData<GraphData>(["graph", projectId], (old) => {
         if (!old) return old;
@@ -567,13 +860,15 @@ export function GraphCanvas({ projectId, orgId, data, onDataChange, focusNodeId 
       toast.error(error instanceof Error ? error.message : "Error creating connection");
       onDataChange();
     } finally {
-      changePendingSaveCount(-1);
+      finishSaving(succeeded);
     }
-  }, [changePendingSaveCount, onDataChange, orgId, projectId, queryClient]);
+  }, [beginSaving, finishSaving, onDataChange, orgId, projectId, queryClient]);
 
   const handleUpdateEdge = async () => {
     if (!editingEdge) return;
     setIsSyncing(true);
+    let succeeded = false;
+    beginSaving();
     try {
       const res = await fetch(`/api/edges/${editingEdge.id}`, {
         method: "PATCH",
@@ -589,17 +884,75 @@ export function GraphCanvas({ projectId, orgId, data, onDataChange, focusNodeId 
       toast.success("Connection updated");
       onDataChange();
       setEditingEdge(null);
+      succeeded = true;
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Error updating connection");
     } finally {
       setIsSyncing(false);
+      finishSaving(succeeded);
     }
   };
 
   const onEdgeClick = useCallback((event: React.MouseEvent, edge: Edge) => {
+    selectedNodeIdRef.current = null;
+    setSelectedNodeId(null);
+    setIsSheetOpen(false);
     setEditingEdge(edge);
     setRelation(edge.data?.originalEdge?.relation || "DEPENDS_ON");
   }, []);
+
+  const onNodeDragStart: NodeDragHandler = useCallback((_event, node) => {
+    setDragHierarchyFeedback({
+      draggingNodeId: node.id,
+      dropTargetNodeId: null,
+      isDetaching: false,
+    });
+  }, []);
+
+  const onNodeDrag: NodeDragHandler = useCallback(
+    (_event, node) => {
+      const currentNodes = nodes.map((candidate) =>
+        candidate.id === node.id
+          ? {
+            ...candidate,
+            position: node.position,
+            parentNode: node.parentNode ?? candidate.parentNode,
+          }
+          : candidate
+      );
+      const draggedNode = currentNodes.find((candidate) => candidate.id === node.id) || node;
+      const dtoById = new Map(data.nodes.map((candidate) => [candidate.id, candidate]));
+      const draggedDto = dtoById.get(node.id);
+      const outsideParent = isDraggedNodeOutsideParent(draggedNode, currentNodes);
+      const rawDropTarget = findHierarchyDropTarget(draggedNode, currentNodes, dtoById);
+      const dropTarget =
+        outsideParent && rawDropTarget?.id === draggedDto?.parentNodeId ? null : rawDropTarget;
+      const isDetaching = Boolean(
+        draggedDto?.parentNodeId &&
+        !dropTarget &&
+        outsideParent
+      );
+
+      setDragHierarchyFeedback((current) => {
+        const next = {
+          draggingNodeId: node.id,
+          dropTargetNodeId: dropTarget?.id || null,
+          isDetaching,
+        };
+
+        if (
+          current.draggingNodeId === next.draggingNodeId &&
+          current.dropTargetNodeId === next.dropTargetNodeId &&
+          current.isDetaching === next.isDetaching
+        ) {
+          return current;
+        }
+
+        return next;
+      });
+    },
+    [data.nodes, nodes]
+  );
 
   const onNodeDragStop: NodeDragHandler = useCallback(
     async (_event, node) => {
@@ -608,94 +961,311 @@ export function GraphCanvas({ projectId, orgId, data, onDataChange, focusNodeId 
           ? {
             ...candidate,
             position: node.position,
-            parentNode: node.parentNode,
+            parentNode: node.parentNode ?? candidate.parentNode,
           }
           : candidate
       );
       const dtoById = new Map(data.nodes.map((candidate) => [candidate.id, candidate]));
       const draggedDto = dtoById.get(node.id);
-      const draggedAbsolute = getAbsoluteNodePosition(
-        currentNodes.find((candidate) => candidate.id === node.id) || node,
-        currentNodes
+      const draggedNode = currentNodes.find((candidate) => candidate.id === node.id) || node;
+      if (!draggedDto) {
+        setDragHierarchyFeedback({ draggingNodeId: null, dropTargetNodeId: null, isDetaching: false });
+        return;
+      }
+
+      const draggedAbsolute = getAbsoluteNodePosition(draggedNode, currentNodes);
+      const outsideParent = isDraggedNodeOutsideParent(draggedNode, currentNodes);
+      const rawDropTarget = findHierarchyDropTarget(draggedNode, currentNodes, dtoById);
+      const dropTarget =
+        outsideParent && rawDropTarget?.id === draggedDto.parentNodeId ? null : rawDropTarget;
+      const shouldDetach = Boolean(
+        draggedDto.parentNodeId &&
+        !dropTarget &&
+        outsideParent
       );
-      const draggedSize = getFlowNodeDimensions(node);
-      const draggedCenter = {
-        x: draggedAbsolute.x + draggedSize.width / 2,
-        y: draggedAbsolute.y + draggedSize.height / 2,
-      };
 
-      const dropTarget = currentNodes
-        .filter((candidate) => {
-          if (candidate.id === node.id) return false;
-          if (!draggedDto) return false;
-          if (isDescendantOf(candidate.id, node.id, dtoById)) return false;
-          return true;
-        })
-        .sort((a, b) => {
-          const aDto = dtoById.get(a.id);
-          const bDto = dtoById.get(b.id);
-          if (!aDto || !bDto) return 0;
-          return getNodeDepth(bDto, dtoById) - getNodeDepth(aDto, dtoById);
-        })
-        .find((candidate) => {
-          const absolute = getAbsoluteNodePosition(candidate, currentNodes);
-          const size = getFlowNodeDimensions(candidate);
-          return (
-            draggedCenter.x >= absolute.x &&
-            draggedCenter.x <= absolute.x + size.width &&
-            draggedCenter.y >= absolute.y &&
-            draggedCenter.y <= absolute.y + size.height
-          );
-        });
-
-      const nextParentId = dropTarget?.id || node.parentNode || null;
+      const nextParentId = dropTarget?.id || (shouldDetach ? null : draggedDto.parentNodeId);
       const parentChanged = (draggedDto?.parentNodeId || null) !== nextParentId;
       const nextPosition = (() => {
-        if (!dropTarget || !parentChanged) {
+        if (dropTarget && parentChanged) {
+          const targetAbsolute = getAbsoluteNodePosition(dropTarget, currentNodes);
+          return {
+            x: Math.max(containerPadding, draggedAbsolute.x - targetAbsolute.x),
+            y: Math.max(containerHeaderHeight, draggedAbsolute.y - targetAbsolute.y),
+          };
+        }
+
+        if (shouldDetach) {
+          return draggedAbsolute;
+        }
+
+        if (!parentChanged && draggedDto.parentNodeId) {
+          return {
+            x: Math.max(containerPadding, node.position.x),
+            y: Math.max(containerHeaderHeight, node.position.y),
+          };
+        }
+
+        if (!parentChanged) {
           return node.position;
         }
 
-        const targetAbsolute = getAbsoluteNodePosition(dropTarget, currentNodes);
-        return {
-          x: Math.max(containerPadding, draggedAbsolute.x - targetAbsolute.x),
-          y: Math.max(containerHeaderHeight, draggedAbsolute.y - targetAbsolute.y),
-        };
+        return draggedAbsolute;
       })();
+      const previousGraphData = queryClient.getQueryData<GraphData>(["graph", projectId]);
 
-      // Optimistically update the cache to avoid snap-back
+      setDragHierarchyFeedback({ draggingNodeId: null, dropTargetNodeId: null, isDetaching: false });
       queryClient.setQueryData<GraphData>(["graph", projectId], (old: GraphData | undefined) => {
         if (!old) return old;
-        return {
-          ...old,
-          nodes: old.nodes.map((n) =>
-            n.id === node.id
-              ? {
-                ...n,
-                parentNodeId: nextParentId,
-                positionX: Math.round(nextPosition.x),
-                positionY: Math.round(nextPosition.y),
-              }
-              : n
-          ),
-        };
+        return updateNodeFrameInGraphData(old, node.id, nextParentId, nextPosition);
       });
+      setNodes((currentFlowNodes) =>
+        currentFlowNodes.map((flowNode) =>
+          flowNode.id === node.id
+            ? {
+              ...flowNode,
+              parentNode: nextParentId || undefined,
+              position: nextPosition,
+            }
+            : flowNode
+        )
+      );
 
       // Persist node position to database
+      let succeeded = false;
+      beginSaving();
       try {
         await persistNodeFrame(node.id, nextParentId, nextPosition.x, nextPosition.y);
         if (parentChanged && dropTarget) {
           toast.success(`Moved inside ${data.nodes.find((n) => n.id === dropTarget.id)?.title || "node"}`);
           onDataChange();
+        } else if (parentChanged && shouldDetach) {
+          toast.success("Node moved out");
+          onDataChange();
         }
+        succeeded = true;
       } catch (error) {
         console.error("Failed to save node position:", error);
         toast.error(error instanceof Error ? error.message : "Failed to save position");
-        // Revert cache on error (optional, but good practice - skipped for brevity or add if needed)
-        onDataChange(); // Refetch to restore correct state
+        if (previousGraphData) {
+          queryClient.setQueryData(["graph", projectId], previousGraphData);
+        }
+        onDataChange();
+      } finally {
+        finishSaving(succeeded);
       }
     },
-    [data.nodes, nodes, projectId, queryClient, onDataChange]
+    [beginSaving, data.nodes, finishSaving, nodes, projectId, queryClient, onDataChange, setNodes]
   );
+
+  const createDeletionSnapshot = useCallback(
+    (nodeIds: string[], standaloneEdgeIds: string[]): DeletedGraphSnapshot => {
+      const selectedNodeIdSet = new Set(nodeIds);
+      const standaloneEdgeIdSet = new Set(standaloneEdgeIds);
+      const snapshotNodes = data.nodes.filter((node) => selectedNodeIdSet.has(node.id));
+      const snapshotEdges = data.edges.filter(
+        (edge) =>
+          standaloneEdgeIdSet.has(edge.id) ||
+          selectedNodeIdSet.has(edge.fromNodeId) ||
+          selectedNodeIdSet.has(edge.toNodeId)
+      );
+      const childParentRestores = data.nodes
+        .filter(
+          (node) =>
+            node.parentNodeId &&
+            selectedNodeIdSet.has(node.parentNodeId) &&
+            !selectedNodeIdSet.has(node.id)
+        )
+        .map((node) => ({ nodeId: node.id, parentNodeId: node.parentNodeId! }));
+      const itemCount = nodeIds.length + standaloneEdgeIds.length;
+
+      return {
+        nodes: snapshotNodes,
+        edges: snapshotEdges,
+        childParentRestores,
+        label: `${itemCount} selected ${itemCount === 1 ? "item" : "items"}`,
+      };
+    },
+    [data.edges, data.nodes]
+  );
+
+  const rememberDeletedGraphSnapshot = useCallback((snapshot: DeletedGraphSnapshot) => {
+    deletedGraphSnapshotRef.current = snapshot;
+  }, []);
+
+  const handleNodeDeleted = useCallback(
+    (nodeId: string) => {
+      if (selectedNodeIdRef.current === nodeId) {
+        selectedNodeIdRef.current = null;
+      }
+      setSelectedNodeId((currentNodeId) => (currentNodeId === nodeId ? null : currentNodeId));
+      setIsSheetOpen(false);
+      setNodes((currentNodes) =>
+        currentNodes
+          .filter((node) => node.id !== nodeId)
+          .map((node) =>
+            node.parentNode === nodeId
+              ? { ...node, parentNode: undefined, extent: undefined }
+              : node
+          )
+      );
+      setEdges((currentEdges) =>
+        currentEdges.filter((edge) => edge.source !== nodeId && edge.target !== nodeId)
+      );
+    },
+    [setEdges, setNodes]
+  );
+
+  const restoreDeletedGraphItems = useCallback(async () => {
+    const snapshot = deletedGraphSnapshotRef.current;
+    if (!snapshot) return;
+
+    deletedGraphSnapshotRef.current = null;
+    let succeeded = false;
+    beginSaving();
+
+    queryClient.setQueryData<GraphData>(["graph", projectId], (old) => {
+      if (!old) return old;
+      return restoreGraphData(old, snapshot);
+    });
+
+    try {
+      const res = await fetch(`/api/projects/${projectId}/graph/restore`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          nodes: snapshot.nodes,
+          edges: snapshot.edges,
+          childParentRestores: snapshot.childParentRestores,
+        }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "Failed to undo deletion");
+      }
+
+      toast.success("Deleted item restored");
+      onDataChange();
+      succeeded = true;
+    } catch (error) {
+      deletedGraphSnapshotRef.current = snapshot;
+      toast.error(error instanceof Error ? error.message : "Failed to undo deletion");
+      onDataChange();
+    } finally {
+      finishSaving(succeeded);
+    }
+  }, [beginSaving, finishSaving, onDataChange, projectId, queryClient]);
+
+  const deleteSelectedGraphItems = useCallback(async () => {
+    const selectedNodeIdsFromFlow = nodes.filter((node) => node.selected).map((node) => node.id);
+    const selectedEdgeIds = edges.filter((edge) => edge.selected).map((edge) => edge.id);
+    const fallbackNodeId = selectedNodeIdRef.current;
+    const shouldUseSelectedNodeFallback =
+      selectedNodeIdsFromFlow.length === 0 &&
+      selectedEdgeIds.length === 0 &&
+      !isSheetOpen &&
+      typeof fallbackNodeId === "string" &&
+      nodes.some((node) => node.id === fallbackNodeId);
+    const selectedNodeIds = shouldUseSelectedNodeFallback ? [fallbackNodeId] : selectedNodeIdsFromFlow;
+
+    if (selectedNodeIds.length === 0 && selectedEdgeIds.length === 0) return;
+
+    const selectedNodeIdSet = new Set(selectedNodeIds);
+    const standaloneEdgeIds = selectedEdgeIds.filter((edgeId) => {
+      const edge = edges.find((candidate) => candidate.id === edgeId);
+      return edge && !selectedNodeIdSet.has(edge.source) && !selectedNodeIdSet.has(edge.target);
+    });
+    const snapshot = createDeletionSnapshot(selectedNodeIds, standaloneEdgeIds);
+    rememberDeletedGraphSnapshot(snapshot);
+
+    let succeeded = false;
+    beginSaving();
+
+    try {
+      selectedNodeIds.forEach((nodeId) => handleNodeDeleted(nodeId));
+
+      if (standaloneEdgeIds.length > 0) {
+        const standaloneEdgeIdSet = new Set(standaloneEdgeIds);
+        setEdges((currentEdges) => currentEdges.filter((edge) => !standaloneEdgeIdSet.has(edge.id)));
+        queryClient.setQueryData<GraphData>(["graph", projectId], (old) => {
+          if (!old) return old;
+          return {
+            ...old,
+            edges: old.edges.filter((edge) => !standaloneEdgeIdSet.has(edge.id)),
+          };
+        });
+      }
+
+      for (const nodeId of selectedNodeIds) {
+        await deleteNodeMutation.mutateAsync({ nodeId, projectId });
+      }
+
+      await Promise.all(
+        standaloneEdgeIds.map(async (edgeId) => {
+          const res = await fetch(`/api/edges/${edgeId}`, { method: "DELETE" });
+          if (!res.ok) {
+            const data = await res.json().catch(() => ({}));
+            throw new Error(data.error || "Failed to delete connection");
+          }
+        })
+      );
+
+      toast.success(`${snapshot.label} deleted`);
+      onDataChange();
+      succeeded = true;
+    } catch (error) {
+      deletedGraphSnapshotRef.current = null;
+      toast.error(error instanceof Error ? error.message : "Failed to delete selected item");
+      onDataChange();
+    } finally {
+      finishSaving(succeeded);
+    }
+  }, [
+    beginSaving,
+    createDeletionSnapshot,
+    deleteNodeMutation,
+    edges,
+    finishSaving,
+    handleNodeDeleted,
+    isSheetOpen,
+    nodes,
+    onDataChange,
+    projectId,
+    queryClient,
+    rememberDeletedGraphSnapshot,
+    setEdges,
+  ]);
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "z") {
+        if (event.shiftKey || shouldIgnoreGraphDeleteKey(event.target)) return;
+        if (!deletedGraphSnapshotRef.current) return;
+        event.preventDefault();
+        void restoreDeletedGraphItems();
+        return;
+      }
+
+      if (event.key !== "Delete" && event.key !== "Backspace") return;
+      if (event.metaKey || event.ctrlKey || event.altKey) return;
+      if (isSheetOpen || addNodeOpen || editingEdge) return;
+      if (shouldIgnoreGraphDeleteKey(event.target)) return;
+
+      const fallbackNodeId = selectedNodeIdRef.current;
+      const hasSelection =
+        nodes.some((node) => node.selected) ||
+        edges.some((edge) => edge.selected) ||
+        Boolean(fallbackNodeId && nodes.some((node) => node.id === fallbackNodeId));
+      if (!hasSelection) return;
+
+      event.preventDefault();
+      void deleteSelectedGraphItems();
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [addNodeOpen, deleteSelectedGraphItems, edges, editingEdge, isSheetOpen, nodes, restoreDeletedGraphItems]);
 
   const handleOrganizeApply = useCallback(
     (positions: Array<{ nodeId: string; x: number; y: number }>) => {
@@ -720,22 +1290,15 @@ export function GraphCanvas({ projectId, orgId, data, onDataChange, focusNodeId 
   );
 
   return (
-    <div className="relative h-full w-full flex flex-col rounded-lg border bg-white overflow-hidden shadow-inner">
+    <div className="relative flex h-full w-full flex-col overflow-hidden bg-white shadow-inner md:rounded-lg md:border">
       {/* Action Center Bar at Top */}
       <ActionCenterBar
         nodes={data.nodes}
         edges={data.edges}
-        userId={useSession().data?.user?.id || ""}
-        onNodeClick={(nodeId) => {
-          setSelectedNodeId(nodeId);
-          setIsSheetOpen(false); // Valid: Reset sheet on new click
-          setNodes((nds) =>
-            nds.map((node) => ({
-              ...node,
-              selected: node.id === nodeId,
-            }))
-          );
-        }}
+        userId={session?.user?.id || ""}
+        saveStatus={saveStatus}
+        lastSavedAt={lastSavedAt}
+        onNodeClick={selectOnlyNode}
       />
 
       {/* Canvas (full remaining height) */}
@@ -755,41 +1318,53 @@ export function GraphCanvas({ projectId, orgId, data, onDataChange, focusNodeId 
           nodes={nodes}
           edges={edges}
           onOrganizeApply={handleOrganizeApply}
+          onPendingSaveChange={changePendingSaveCount}
         />
         <ReactFlow
-          nodes={nodes}
+          nodes={visibleNodes}
           edges={edges}
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
           onConnect={onConnect}
           onEdgeClick={onEdgeClick}
           onNodeClick={(_event, node) => {
-            setSelectedNodeId(node.id);
-            setIsSheetOpen(false);
+            selectOnlyNode(node.id);
           }}
+          onNodeDragStart={onNodeDragStart}
+          onNodeDrag={onNodeDrag}
           onNodeDragStop={onNodeDragStop}
+          onInit={(instance) => {
+            reactFlowInstanceRef.current = instance;
+          }}
           nodeTypes={nodeTypes}
+          deleteKeyCode={null}
+          connectionLineType={ConnectionLineType.Bezier}
+          connectionLineStyle={graphEdgeStyle}
           fitView
           snapToGrid
           snapGrid={[15, 15]}
           onPaneContextMenu={(event) => {
             event.preventDefault();
+            const flowPosition = reactFlowInstanceRef.current?.screenToFlowPosition({
+              x: event.clientX,
+              y: event.clientY,
+            }) ?? { x: event.clientX, y: event.clientY };
+
             setContextMenu({
               x: event.clientX,
               y: event.clientY,
-              canvasX: event.clientX,
-              canvasY: event.clientY,
+              canvasX: flowPosition.x,
+              canvasY: flowPosition.y,
             });
           }}
           onPaneClick={() => {
             setContextMenu(null);
-            setSelectedNodeId(null);
-            setIsSheetOpen(false);
+            clearSelection();
           }}
         >
           <Background color="#f1f5f9" gap={15} />
           <Controls />
-          <MiniMap nodeStrokeColor="#e2e8f0" nodeColor="#f8fafc" />
+          <MiniMap className="hidden sm:block" nodeStrokeColor="#e2e8f0" nodeColor="#f8fafc" />
         </ReactFlow>
 
         {/* Empty State */}
@@ -809,6 +1384,7 @@ export function GraphCanvas({ projectId, orgId, data, onDataChange, focusNodeId 
               <Button
                 onClick={() => {
                   setAddNodeParent(null);
+                  setAddNodePosition(null);
                   setAddNodeOpen(true);
                 }}
                 className="bg-blue-600 hover:bg-blue-700 text-white shadow-md"
@@ -827,8 +1403,9 @@ export function GraphCanvas({ projectId, orgId, data, onDataChange, focusNodeId 
           <CanvasContextMenu
             position={contextMenu}
             onClose={() => setContextMenu(null)}
-            onAddNode={() => {
+            onAddNode={(x, y) => {
               setAddNodeParent(null);
+              setAddNodePosition({ x, y });
               setAddNodeOpen(true);
             }}
           />
@@ -841,11 +1418,19 @@ export function GraphCanvas({ projectId, orgId, data, onDataChange, focusNodeId 
         orgId={orgId}
         parentNodeId={addNodeParent?.id || null}
         parentNodeTitle={addNodeParent?.title || null}
+        initialPosition={addNodePosition}
         open={addNodeOpen}
-        onOpenChange={setAddNodeOpen}
+        onOpenChange={(open) => {
+          setAddNodeOpen(open);
+          if (!open) {
+            setAddNodeParent(null);
+            setAddNodePosition(null);
+          }
+        }}
         onSuccess={() => {
           onDataChange();
           setAddNodeParent(null);
+          setAddNodePosition(null);
           setAddNodeOpen(false);
         }}
         onPendingSaveChange={changePendingSaveCount}
@@ -880,16 +1465,20 @@ export function GraphCanvas({ projectId, orgId, data, onDataChange, focusNodeId 
               onClick={async () => {
                 if (!editingEdge) return;
                 setIsSyncing(true);
+                let succeeded = false;
+                beginSaving();
                 try {
                   const res = await fetch(`/api/edges/${editingEdge.id}`, { method: "DELETE" });
                   if (!res.ok) throw new Error("Delete failed");
                   toast.success("Connection removed");
                   onDataChange();
                   setEditingEdge(null);
+                  succeeded = true;
                 } catch {
                   toast.error("Failed to delete connection");
                 } finally {
                   setIsSyncing(false);
+                  finishSaving(succeeded);
                 }
               }}
             >
@@ -913,6 +1502,11 @@ export function GraphCanvas({ projectId, orgId, data, onDataChange, focusNodeId 
         projectId={projectId}
         orgId={orgId}
         onDataChange={onDataChange}
+        onDeleted={(nodeId) => {
+          rememberDeletedGraphSnapshot(createDeletionSnapshot([nodeId], []));
+          handleNodeDeleted(nodeId);
+        }}
+        onPendingSaveChange={changePendingSaveCount}
       />
     </div>
   );

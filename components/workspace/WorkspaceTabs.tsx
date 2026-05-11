@@ -18,10 +18,11 @@ interface WorkspaceTabsProps {
 export function WorkspaceTabs({ activeTab, onTabChange, counts }: WorkspaceTabsProps) {
     return (
         <Tabs value={activeTab} onValueChange={(v) => onTabChange(v as WorkspaceTab)}>
-            <TabsList className="bg-[#f7f7f5] border border-[#e8e8e6]">
+            <div className="-mx-1 overflow-x-auto px-1 pb-1">
+            <TabsList className="inline-flex h-auto min-w-max bg-[#f7f7f5] border border-[#e8e8e6]">
                 <TabsTrigger
                     value="all"
-                    className="data-[state=active]:bg-white data-[state=active]:shadow-sm"
+                    className="shrink-0 data-[state=active]:bg-white data-[state=active]:shadow-sm"
                 >
                     All
                     {counts && counts.all > 0 && (
@@ -30,7 +31,7 @@ export function WorkspaceTabs({ activeTab, onTabChange, counts }: WorkspaceTabsP
                 </TabsTrigger>
                 <TabsTrigger
                     value="recents"
-                    className="data-[state=active]:bg-white data-[state=active]:shadow-sm"
+                    className="shrink-0 data-[state=active]:bg-white data-[state=active]:shadow-sm"
                 >
                     Recents
                     {counts && counts.recents > 0 && (
@@ -39,7 +40,7 @@ export function WorkspaceTabs({ activeTab, onTabChange, counts }: WorkspaceTabsP
                 </TabsTrigger>
                 <TabsTrigger
                     value="favorites"
-                    className="data-[state=active]:bg-white data-[state=active]:shadow-sm"
+                    className="shrink-0 data-[state=active]:bg-white data-[state=active]:shadow-sm"
                 >
                     Favorites
                     {counts && counts.favorites > 0 && (
@@ -48,7 +49,7 @@ export function WorkspaceTabs({ activeTab, onTabChange, counts }: WorkspaceTabsP
                 </TabsTrigger>
                 <TabsTrigger
                     value="unfiled"
-                    className="data-[state=active]:bg-white data-[state=active]:shadow-sm"
+                    className="shrink-0 data-[state=active]:bg-white data-[state=active]:shadow-sm"
                 >
                     Unfiled
                     {counts && counts.unfiled > 0 && (
@@ -56,6 +57,7 @@ export function WorkspaceTabs({ activeTab, onTabChange, counts }: WorkspaceTabsP
                     )}
                 </TabsTrigger>
             </TabsList>
+            </div>
         </Tabs>
     );
 }

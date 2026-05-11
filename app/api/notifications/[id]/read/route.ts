@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
-import { requireAuth } from "@/lib/utils/auth";
+import { getUserTeams, requireAuth } from "@/lib/utils/auth";
 
 export async function PATCH(
     request: NextRequest,
@@ -18,28 +18,36 @@ export async function PATCH(
             return NextResponse.json({ error: "Notification not found" }, { status: 404 });
         }
 
-        if (notification.userId !== user.id) {
-            if (notification.targetType !== "TEAM" || !notification.targetTeamId) {
-                return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
-            }
+        const membership = await prisma.orgMember.findUnique({
+            where: { orgId_userId: { orgId: notification.orgId, userId: user.id } },
+            select: { status: true },
+        });
 
-            const teamMember = await prisma.teamMember.findFirst({
-                where: {
-                    teamId: notification.targetTeamId,
-                    userId: user.id,
-                },
-                select: { id: true },
-            });
-
-            if (!teamMember) {
-                return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
-            }
+        if (!membership || !["ACTIVE", "PENDING_TEAM_ASSIGNMENT"].includes(membership.status)) {
+            return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
         }
 
-        await prisma.notification.update({
-            where: { id },
+        const teamIds = await getUserTeams(notification.orgId, user.id);
+
+        const result = await prisma.notification.updateMany({
+            where: {
+                id,
+                orgId: notification.orgId,
+                isRead: false,
+                OR: [
+                    { userId: user.id },
+                    {
+                        targetType: "TEAM",
+                        targetTeamId: { in: teamIds },
+                    },
+                ],
+            },
             data: { isRead: true },
         });
+
+        if (result.count === 0) {
+            return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
+        }
 
         return NextResponse.json({ success: true });
     } catch (error) {

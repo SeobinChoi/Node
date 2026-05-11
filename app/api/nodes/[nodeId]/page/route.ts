@@ -5,6 +5,7 @@ import { requireProjectEdit, requireProjectView } from "@/lib/utils/permissions"
 import { authOrPermissionErrorResponse } from "@/lib/utils/api-error-responses";
 import { createActivityLog } from "@/lib/utils/activity-log";
 import { createNotification } from "@/lib/utils/notifications";
+import { Prisma } from "@prisma/client";
 import {
     extractMentionNames,
     getNodeForCollaboration,
@@ -66,6 +67,9 @@ export async function GET(
     } catch (error) {
         const authResponse = authOrPermissionErrorResponse(error);
         if (authResponse) return authResponse;
+        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2003") {
+            return NextResponse.json({ error: "Node not found" }, { status: 404 });
+        }
         console.error("GET /api/nodes/[nodeId]/page error:", error);
         return NextResponse.json({ error: "Failed to fetch task page" }, { status: 500 });
     }
@@ -138,6 +142,9 @@ export async function PATCH(
 
         const authResponse = authOrPermissionErrorResponse(error);
         if (authResponse) return authResponse;
+        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2003") {
+            return NextResponse.json({ error: "Node not found" }, { status: 404 });
+        }
 
         console.error("PATCH /api/nodes/[nodeId]/page error:", error);
         return NextResponse.json({ error: "Failed to update task page" }, { status: 500 });

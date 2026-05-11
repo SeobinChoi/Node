@@ -14,6 +14,7 @@ export type ActivityAction =
   | "CREATE_EDGE"
   | "UPDATE_EDGE"
   | "DELETE_EDGE"
+  | "RESTORE_GRAPH_ITEMS"
   | "CREATE_REQUEST"
   | "RESPOND_REQUEST"
   | "CLAIM_REQUEST"

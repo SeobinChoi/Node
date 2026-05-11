@@ -16,11 +16,17 @@
 - Task collaboration now uses `NodePage`, `NodeComment`, and `NodeAttachment` Prisma models with node-scoped APIs under `app/api/nodes/[nodeId]/`.
 - `components/graph/NodeDetailSheet.tsx` is now the primary task workspace surface, with details, page, comments, files, and activity views.
 - Task file uploads are stored outside markdown through Supabase Storage using the `node-attachments` bucket by default.
-- Nodes can now form a hierarchy through `nodes.parent_node_id`; the graph UI renders parent nodes as container blocks and supports Scratch-like drag-in/drag-out nesting.
+- Nodes can now form a hierarchy through `nodes.parent_node_id`; the graph UI renders parent nodes as container blocks and supports animated grab-and-drop drag-in/out nesting, including outside-parent detach.
 - Graph node and edge creation uses optimistic UI updates first, then reconciles with the server; pending saves install browser/internal-link leave warnings.
+- Regular graph nodes measure the closed-card content height and keep left/right edge handles fixed at that closed-state vertical center, so selected-node expansion does not move edge anchors.
+- Graph node/edge deletion is immediate without native confirmation dialogs, and the most recent deletion can be restored with Ctrl/Cmd+Z through `/api/projects/[projectId]/graph/restore`.
+- The node-level Analyze button and `/api/ai/analyze-block` route are currently removed; other project-level AI generation/organize routes remain.
 - Workspace admin/member management now lives canonically at `app/(dashboard)/org/[orgId]/settings/page.tsx`; the older `app/(dashboard)/organization/members/page.tsx` route is legacy.
+- Org inbox notifications stay visible after being marked read, show read state in-place, and support marking the visible unread notifications in the current tab read in one action.
 - Team-targeted requests now use stable `requests.targetTeamId` IDs with `toTeam` kept only as a backward-compatible display alias.
 - Default team identity is now a schema flag (`teams.isDefault`) instead of the literal name `"Default Team"`.
+- Dashboard org routes now render through `components/layout/DashboardShell.tsx`, which keeps the resizable desktop sidebar on medium screens and above while using a mobile top app bar plus left navigation drawer on small screens.
+- Core dashboard surfaces now have mobile-safe layouts for workspace home, projects, inbox, settings, project headers, graph toolbar/action bar, and task detail sheets.
 
 ## Key decisions
 - Persistent project state is tracked in `.codex/project.md`, `.codex/tasks.md`, and `.codex/log.md`.
@@ -32,8 +38,10 @@
 - The app should no longer auto-provision users into a seeded demo org or create dummy team members by default; old demo data is now cleaned up explicitly when needed.
 - Member-role naming should be split by scope: workspace/org uses `Admin` and `Member`; project access uses `Admin`, `Editor`, and `Viewer`, with `Guest` reserved as a later optional role.
 - Vercel deployments must rely on Vercel-managed environment variables and request-host detection, not uploaded local `.env*` files.
+- Vercel deployments exclude local agent state and browser-verification artifacts through `.vercelignore`.
 - Prisma runtime should normalize Supabase transaction-pooler URLs by adding `pgbouncer=true` and `connection_limit=1` when those query params are missing from `DATABASE_URL`.
 - The root dashboard route should resolve the user's workspace redirect on the server instead of rendering a client-side loading screen that depends on `/api/workspaces`.
+- The root dashboard route should not render a `No workspaces yet` fallback: unauthenticated visitors go to `/login`, while authenticated users without a workspace get a personal workspace/default team created and are redirected to `/org/[orgId]/projects`.
 - The dashboard segment must render dynamically because auth/session access uses request headers; forcing static rendering on `/` causes `DYNAMIC_SERVER_USAGE`.
 - The canonical GitHub remote for this workspace is now the personal `SeobinChoi/Node` repository instead of the old `SogangAiStudy/Node` org remote.
 - Admin navigation for workspace members/teams should route to the canonical org-scoped settings page, not the legacy `/organization/members` route.
@@ -48,3 +56,4 @@
 - Playwright uses bundled Chromium installed under `/Users/xavi/Library/Caches/ms-playwright/`; the global Codex Playwright MCP config was updated to point at that executable, but already-running Codex sessions may need restart before MCP browser tools reload the new setting.
 - Playwright webServer uses `next dev --webpack` because the Turbopack dev server can hang while compiling `/api/projects/[projectId]/invites`; production builds still use the default Next.js production build path.
 - New graph connections default to `DEPENDS_ON` without a creation-time relation picker; existing relation types are changed by clicking an existing edge and editing it.
+- Mobile dashboard navigation should use the top app bar plus drawer pattern; the desktop sidebar remains the primary desktop navigation.

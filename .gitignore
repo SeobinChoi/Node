@@ -17,6 +17,8 @@ docker-compose.yml
 /coverage
 /test-results
 /playwright-report
+.playwright-mcp/
+node-login-after-card-wrap-fix.png
 
 # next.js
 /.next/

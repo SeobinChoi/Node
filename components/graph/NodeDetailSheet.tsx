@@ -22,7 +22,6 @@ import {
     Clock,
     CheckCircle2,
     PlayCircle,
-    Sparkles,
     MessageSquarePlus,
     FileText,
     MessageSquare,
@@ -36,7 +35,7 @@ import { toast } from "sonner";
 import { CreateRequestDialog } from "./CreateRequestDialog";
 import { MultiSelectSearch, SelectItem } from "@/components/ui/multi-select-search";
 import { cn } from "@/lib/utils";
-import { useUpdateNode } from "@/hooks/use-node-mutations";
+import { useDeleteNode, useUpdateNode } from "@/hooks/use-node-mutations";
 
 interface NodeDetailSheetProps {
     node: NodeDTO | null;
@@ -45,6 +44,8 @@ interface NodeDetailSheetProps {
     projectId: string;
     orgId: string;
     onDataChange: () => void;
+    onDeleted?: (nodeId: string) => void;
+    onPendingSaveChange?: (delta: number) => void;
 }
 
 interface ProjectMemberOption {
@@ -72,6 +73,9 @@ export function NodeDetailSheet({
     open,
     onOpenChange,
     projectId,
+    onDataChange,
+    onDeleted,
+    onPendingSaveChange,
 }: NodeDetailSheetProps) {
     const [title, setTitle] = useState("");
     const [description, setDescription] = useState("");
@@ -82,11 +86,12 @@ export function NodeDetailSheet({
     const [members, setMembers] = useState<SelectItem[]>([]);
     const queryClient = useQueryClient();
     const updateNodeMutation = useUpdateNode();
+    const deleteNodeMutation = useDeleteNode();
 
     const taskPageQuery = useQuery<NodePageResponse>({
         queryKey: ["node-page", node?.id],
-        queryFn: async () => {
-            const res = await fetch(`/api/nodes/${node!.id}/page`);
+        queryFn: async ({ signal }) => {
+            const res = await fetch(`/api/nodes/${node!.id}/page`, { signal });
             if (!res.ok) throw new Error("Failed to fetch task page");
             return res.json();
         },
@@ -95,8 +100,8 @@ export function NodeDetailSheet({
 
     const commentsQuery = useQuery<NodeCommentsResponse>({
         queryKey: ["node-comments", node?.id],
-        queryFn: async () => {
-            const res = await fetch(`/api/nodes/${node!.id}/comments`);
+        queryFn: async ({ signal }) => {
+            const res = await fetch(`/api/nodes/${node!.id}/comments`, { signal });
             if (!res.ok) throw new Error("Failed to fetch comments");
             return res.json();
         },
@@ -105,8 +110,8 @@ export function NodeDetailSheet({
 
     const attachmentsQuery = useQuery<NodeAttachmentsResponse>({
         queryKey: ["node-attachments", node?.id],
-        queryFn: async () => {
-            const res = await fetch(`/api/nodes/${node!.id}/attachments`);
+        queryFn: async ({ signal }) => {
+            const res = await fetch(`/api/nodes/${node!.id}/attachments`, { signal });
             if (!res.ok) throw new Error("Failed to fetch attachments");
             return res.json();
         },
@@ -131,6 +136,12 @@ export function NodeDetailSheet({
             queryClient.invalidateQueries({ queryKey: ["node-page", node?.id] });
         },
         onError: (error: Error) => toast.error(error.message),
+        onMutate: () => {
+            onPendingSaveChange?.(1);
+        },
+        onSettled: () => {
+            onPendingSaveChange?.(-1);
+        },
     });
 
     const commentMutation = useMutation({
@@ -242,6 +253,7 @@ export function NodeDetailSheet({
 
     const handleSaveDetails = async () => {
         setIsSaving(true);
+        onPendingSaveChange?.(1);
         try {
             await updateNode({ title, description });
             toast.success("Saved successfully");
@@ -249,6 +261,7 @@ export function NodeDetailSheet({
             toast.error("Failed to save");
         } finally {
             setIsSaving(false);
+            onPendingSaveChange?.(-1);
         }
     };
 
@@ -257,6 +270,22 @@ export function NodeDetailSheet({
     const handleStatusChange = async (newStatus: ManualStatus) => {
         if (newStatus === currentStatus) return;
         updateNode({ manualStatus: newStatus });
+    };
+
+    const handleDeleteNode = async () => {
+        const deletedNodeId = node.id;
+        onPendingSaveChange?.(1);
+        try {
+            await deleteNodeMutation.mutateAsync({ nodeId: deletedNodeId, projectId });
+            onDeleted?.(deletedNodeId);
+            onOpenChange(false);
+            toast.success("Node deleted");
+            onDataChange();
+        } catch {
+            // The mutation hook shows the failure toast and restores graph cache.
+        } finally {
+            onPendingSaveChange?.(-1);
+        }
     };
 
     const getInitials = (name: string) => {
@@ -271,10 +300,10 @@ export function NodeDetailSheet({
     return (
         <>
             <Sheet open={open} onOpenChange={onOpenChange}>
-                <SheetContent className="w-[400px] sm:w-[680px] overflow-y-auto p-6 sm:p-8">
+                <SheetContent className="w-full max-w-full overflow-y-auto p-4 sm:w-[680px] sm:p-8">
                     <SheetHeader className="space-y-4 mb-6">
-                        <div className="flex items-start justify-between pr-8">
-                            <div className="space-y-1 flex-1 mr-4">
+                        <div className="flex flex-col gap-3 pr-8 sm:flex-row sm:items-start sm:justify-between">
+                            <div className="mr-0 flex-1 space-y-1 sm:mr-4">
                                 <Input
                                     value={title}
                                     onChange={(e) => setTitle(e.target.value)}
@@ -287,6 +316,7 @@ export function NodeDetailSheet({
                                 size="sm"
                                 onClick={handleSaveDetails}
                                 disabled={isSaving}
+                                className="w-full sm:w-auto"
                             >
                                 {isSaving ? (
                                     <>
@@ -300,13 +330,13 @@ export function NodeDetailSheet({
                         </div>
 
                         {/* Status Toggles */}
-                        <div className="flex p-1 bg-slate-100 rounded-lg w-fit">
+                        <div className="grid w-full grid-cols-3 rounded-lg bg-slate-100 p-1 sm:flex sm:w-fit">
                             {(["TODO", "DOING", "DONE"] as ManualStatus[]).map((status) => (
                                 <button
                                     key={status}
                                     onClick={() => handleStatusChange(status)}
                                     className={cn(
-                                        "px-4 py-1.5 text-xs font-medium rounded-md transition-all flex items-center gap-2",
+                                        "justify-center rounded-md px-2 py-1.5 text-xs font-medium transition-all flex items-center gap-1.5 sm:px-4 sm:gap-2",
                                         currentStatus === status
                                             ? "bg-white text-slate-900 shadow-sm"
                                             : "text-slate-500 hover:text-slate-700 hover:bg-slate-200/50"
@@ -321,23 +351,23 @@ export function NodeDetailSheet({
                         </div>
                     </SheetHeader>
 
-                    <Tabs defaultValue="details" className="py-6">
-                        <TabsList className="grid w-full grid-cols-5">
-                            <TabsTrigger value="details">Details</TabsTrigger>
-                            <TabsTrigger value="page">
-                                <FileText className="h-3.5 w-3.5 mr-1" />
+                    <Tabs defaultValue="details" className="py-4 sm:py-6">
+                        <TabsList className="grid h-auto w-full grid-cols-5">
+                            <TabsTrigger value="details" className="px-1 text-[11px] sm:text-sm">Details</TabsTrigger>
+                            <TabsTrigger value="page" className="px-1 text-[11px] sm:text-sm">
+                                <FileText className="h-3.5 w-3.5 sm:mr-1" />
                                 Page
                             </TabsTrigger>
-                            <TabsTrigger value="comments">
-                                <MessageSquare className="h-3.5 w-3.5 mr-1" />
+                            <TabsTrigger value="comments" className="px-1 text-[11px] sm:text-sm">
+                                <MessageSquare className="h-3.5 w-3.5 sm:mr-1" />
                                 {node.commentCount || 0}
                             </TabsTrigger>
-                            <TabsTrigger value="files">
-                                <Paperclip className="h-3.5 w-3.5 mr-1" />
+                            <TabsTrigger value="files" className="px-1 text-[11px] sm:text-sm">
+                                <Paperclip className="h-3.5 w-3.5 sm:mr-1" />
                                 {node.attachmentCount || 0}
                             </TabsTrigger>
-                            <TabsTrigger value="activity">
-                                <History className="h-3.5 w-3.5 mr-1" />
+                            <TabsTrigger value="activity" className="px-1 text-[11px] sm:text-sm">
+                                <History className="h-3.5 w-3.5 sm:mr-1" />
                             </TabsTrigger>
                         </TabsList>
 
@@ -452,17 +482,6 @@ export function NodeDetailSheet({
                                 {node.computedStatus === "TODO" && "Ready to start."}
                                 {node.computedStatus === "DONE" && "Completed."}
                             </p>
-                            {node.computedStatus === "BLOCKED" && (
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    className="w-full mt-2 text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
-                                    onClick={() => setRequestDialogOpen(true)}
-                                >
-                                    <Sparkles className="w-3 h-3 mr-2" />
-                                    Ask AI to Resolve Blockers
-                                </Button>
-                            )}
                         </div>
                         </TabsContent>
 
@@ -473,7 +492,7 @@ export function NodeDetailSheet({
                                 placeholder="Write task notes, acceptance criteria, decisions, or handoff details..."
                                 className="min-h-[280px] font-mono text-sm"
                             />
-                            <div className="flex justify-between text-xs text-muted-foreground">
+                            <div className="flex flex-col gap-2 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
                                 <span>Markdown is supported. Mention project members with @name.</span>
                                 <Button
                                     size="sm"
@@ -540,7 +559,7 @@ export function NodeDetailSheet({
                             />
                             <div className="space-y-2">
                                 {(attachmentsQuery.data?.attachments || []).map((attachment) => (
-                                    <div key={attachment.id} className="flex items-center justify-between rounded-md border p-3">
+                                    <div key={attachment.id} className="flex flex-col gap-2 rounded-md border p-3 sm:flex-row sm:items-center sm:justify-between">
                                         <div className="min-w-0">
                                             <p className="truncate text-sm font-medium">{attachment.fileName}</p>
                                             <p className="text-xs text-muted-foreground">
@@ -587,14 +606,29 @@ export function NodeDetailSheet({
                         </TabsContent>
                     </Tabs>
 
-                    <SheetFooter className="flex-col sm:justify-start gap-2 pt-4 border-t">
-                        <Button
-                            className="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 text-white"
-                            onClick={() => setRequestDialogOpen(true)}
-                        >
-                            <MessageSquarePlus className="w-4 h-4 mr-2" />
-                            New Request / Question
-                        </Button>
+                    <SheetFooter className="pt-4 border-t">
+                        <div className="flex w-full flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-between">
+                            <Button
+                                variant="destructive"
+                                className="w-full sm:w-auto"
+                                onClick={handleDeleteNode}
+                                disabled={deleteNodeMutation.isPending}
+                            >
+                                {deleteNodeMutation.isPending ? (
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                ) : (
+                                    <Trash2 className="w-4 h-4" />
+                                )}
+                                Delete node
+                            </Button>
+                            <Button
+                                className="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 text-white"
+                                onClick={() => setRequestDialogOpen(true)}
+                            >
+                                <MessageSquarePlus className="w-4 h-4 mr-2" />
+                                New Request / Question
+                            </Button>
+                        </div>
                     </SheetFooter>
                 </SheetContent>
             </Sheet>

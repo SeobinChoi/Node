@@ -11,7 +11,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   const redirectTo = callbackUrl || "/";
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-50">
+    <div className="flex min-h-screen items-center justify-center bg-gray-50 p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1">
           <CardTitle className="text-2xl font-bold">Node</CardTitle>

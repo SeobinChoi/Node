@@ -70,12 +70,12 @@ export function ActionCenter({ orgId }: ActionCenterProps) {
                     </div>
                 }
                 renderItem={(item) => (
-                    <div className="p-4 flex items-start gap-3">
+                    <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-start">
                         <div className="mt-1">
                             <div className="h-2 w-2 rounded-full bg-green-500" />
                         </div>
                         <div className="flex-1 min-w-0">
-                            <div className="flex items-center justify-between mb-1">
+                            <div className="mb-1 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
                                 <Link
                                     href={`/org/${item.orgId}/projects/${item.projectId}/graph?nodeId=${item.id}`}
                                     className="text-sm font-medium text-foreground hover:underline truncate block"
@@ -83,7 +83,7 @@ export function ActionCenter({ orgId }: ActionCenterProps) {
                                     {item.title}
                                 </Link>
                                 {item.dueAt && (
-                                    <span className="text-xs text-muted-foreground whitespace-nowrap ml-2">
+                                    <span className="text-xs text-muted-foreground sm:ml-2 sm:whitespace-nowrap">
                                         Due {formatDistanceToNow(new Date(item.dueAt), { addSuffix: true })}
                                     </span>
                                 )}
@@ -96,7 +96,7 @@ export function ActionCenter({ orgId }: ActionCenterProps) {
                         </div>
                         <Link
                             href={`/org/${item.orgId}/projects/${item.projectId}/graph?nodeId=${item.id}`}
-                            className="text-xs font-medium text-primary bg-primary/10 hover:bg-primary/20 px-3 py-1.5 rounded-full transition-colors self-center"
+                            className="self-start rounded-full bg-primary/10 px-3 py-1.5 text-xs font-medium text-primary transition-colors hover:bg-primary/20 sm:self-center"
                         >
                             View
                         </Link>
@@ -116,19 +116,19 @@ export function ActionCenter({ orgId }: ActionCenterProps) {
                     </div>
                 }
                 renderItem={(item) => (
-                    <div className="p-4 flex items-start gap-4">
+                    <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-start sm:gap-4">
                         <div className="mt-1">
                             <div className="h-2 w-2 rounded-full bg-yellow-500" />
                         </div>
                         <div className="flex-1 min-w-0">
-                            <div className="flex items-center justify-between mb-1">
+                            <div className="mb-1 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
                                 <Link
                                     href={`/org/${item.orgId}/projects/${item.projectId}/graph?nodeId=${item.id}`}
                                     className="text-sm font-medium text-foreground hover:underline truncate block"
                                 >
                                     {item.title}
                                 </Link>
-                                <span className="text-xs text-muted-foreground whitespace-nowrap ml-2">
+                                <span className="text-xs text-muted-foreground sm:ml-2 sm:whitespace-nowrap">
                                     {formatDistanceToNow(new Date(item.waitingSince), { addSuffix: true })}
                                 </span>
                             </div>
@@ -161,19 +161,19 @@ export function ActionCenter({ orgId }: ActionCenterProps) {
                     </div>
                 }
                 renderItem={(item) => (
-                    <div className="p-4 flex items-start gap-4">
+                    <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-start sm:gap-4">
                         <div className="mt-1">
                             <div className="h-2 w-2 rounded-full bg-red-500" />
                         </div>
                         <div className="flex-1 min-w-0">
-                            <div className="flex items-center justify-between mb-1">
+                            <div className="mb-1 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
                                 <Link
                                     href={`/org/${item.orgId}/projects/${item.projectId}/graph?nodeId=${item.id}`}
                                     className="text-sm font-medium text-foreground hover:underline truncate block"
                                 >
                                     {item.title}
                                 </Link>
-                                <span className="text-xs font-bold text-red-500 bg-red-50 dark:bg-red-900/20 px-2 py-0.5 rounded-full border border-red-200 dark:border-red-900/30">
+                                <span className="w-fit rounded-full border border-red-200 bg-red-50 px-2 py-0.5 text-xs font-bold text-red-500 dark:border-red-900/30 dark:bg-red-900/20">
                                     Blocks {item.blockedCount} item{item.blockedCount !== 1 ? 's' : ''}
                                 </span>
                             </div>
@@ -188,7 +188,7 @@ export function ActionCenter({ orgId }: ActionCenterProps) {
                         </div>
                         <Link
                             href={`/org/${item.orgId}/projects/${item.projectId}/graph?nodeId=${item.id}`}
-                            className="text-xs font-medium text-foreground bg-muted hover:bg-muted/80 px-3 py-1.5 rounded-full transition-colors self-center flex items-center gap-1"
+                            className="flex w-fit items-center gap-1 rounded-full bg-muted px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-muted/80 sm:self-center"
                         >
                             Unblock <ArrowRight className="h-3 w-3" />
                         </Link>

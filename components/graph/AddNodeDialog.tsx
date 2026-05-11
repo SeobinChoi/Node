@@ -31,6 +31,7 @@ interface AddNodeDialogProps {
   orgId: string;
   parentNodeId?: string | null;
   parentNodeTitle?: string | null;
+  initialPosition?: { x: number; y: number } | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess: () => void;
@@ -53,7 +54,7 @@ function makeTempId(prefix: string) {
   return `${prefix}-${globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`}`;
 }
 
-export function AddNodeDialog({ projectId, orgId, parentNodeId, parentNodeTitle, open, onOpenChange, onSuccess, onPendingSaveChange }: AddNodeDialogProps) {
+export function AddNodeDialog({ projectId, orgId, parentNodeId, parentNodeTitle, initialPosition, open, onOpenChange, onSuccess, onPendingSaveChange }: AddNodeDialogProps) {
   const { data: session } = useSession();
   const queryClient = useQueryClient();
   const [title, setTitle] = useState("");
@@ -119,6 +120,9 @@ export function AddNodeDialog({ projectId, orgId, parentNodeId, parentNodeTitle,
     const selectedTeams = teamIds
       .map((id) => teams.find((team) => team.id === id))
       .filter((team): team is Team => Boolean(team));
+    const nodePosition = parentNodeId
+      ? { x: 48, y: 96 }
+      : initialPosition ?? { x: Math.random() * 800, y: Math.random() * 600 };
     const optimisticNode: NodeDTO = {
       id: tempId,
       orgId,
@@ -143,8 +147,8 @@ export function AddNodeDialog({ projectId, orgId, parentNodeId, parentNodeTitle,
       commentCount: 0,
       attachmentCount: 0,
       childCount: 0,
-      positionX: parentNodeId ? 48 : Math.random() * 800,
-      positionY: parentNodeId ? 96 : Math.random() * 600,
+      positionX: nodePosition.x,
+      positionY: nodePosition.y,
     };
 
     try {
@@ -178,6 +182,8 @@ export function AddNodeDialog({ projectId, orgId, parentNodeId, parentNodeTitle,
           ownerIds: uniqueOwnerIds, // All owners/participants
           teamIds,
           parentNodeId: parentNodeId || null,
+          positionX: nodePosition.x,
+          positionY: nodePosition.y,
           dueAt: dueAt ? new Date(dueAt).toISOString() : null,
         }),
       });
@@ -299,7 +305,7 @@ export function AddNodeDialog({ projectId, orgId, parentNodeId, parentNodeTitle,
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div className="grid gap-2">
                   <Label htmlFor="type" className="text-sm font-medium">Type</Label>
                   <Select value={type} onValueChange={setType}>

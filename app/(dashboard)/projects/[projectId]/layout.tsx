@@ -33,7 +33,7 @@ export default function ProjectLayout({ children }: { children: React.ReactNode 
           : "now";
 
   return (
-    <div className="flex flex-col h-screen">
+    <div className="flex h-full min-h-0 flex-col">
       {/* Project Header */}
       {projectData && (
         <ProjectHeader
@@ -43,7 +43,7 @@ export default function ProjectLayout({ children }: { children: React.ReactNode 
         />
       )}
 
-      <div className="container mx-auto px-4 py-8 flex-1 overflow-auto">
+      <div className="container mx-auto flex-1 overflow-auto px-4 py-5 sm:py-8">
         <Tabs value={currentTab} className="mb-6">
           <TabsList>
             <Link href="/">

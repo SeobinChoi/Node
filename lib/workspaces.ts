@@ -13,6 +13,7 @@ export interface WorkspaceSummary {
 
 interface SessionUserLike {
   id: string;
+  name?: string | null;
   email?: string | null;
 }
 
@@ -132,4 +133,110 @@ export async function getCurrentUserWorkspaces(): Promise<WorkspaceSummary[]> {
       };
     })
   );
+}
+
+function getDefaultWorkspaceName(user: SessionUserLike) {
+  const name = user.name?.trim() || user.email?.split("@")[0]?.trim();
+  return name ? `${name}'s Workspace` : "Personal Workspace";
+}
+
+export async function ensureCurrentUserWorkspace(): Promise<WorkspaceSummary> {
+  const sessionUser = await requireAuth();
+  const dbUser = await resolveWorkspaceUser(sessionUser);
+
+  if (!dbUser) {
+    throw new Error("Unauthorized - User not found in database");
+  }
+
+  const existingMembership = await prisma.orgMember.findFirst({
+    where: {
+      userId: dbUser.id,
+      status: {
+        in: ["ACTIVE", "PENDING_TEAM_ASSIGNMENT", "PENDING_APPROVAL"],
+      },
+    },
+    orderBy: {
+      createdAt: "asc",
+    },
+    select: {
+      orgId: true,
+      status: true,
+      organization: {
+        select: {
+          name: true,
+        },
+      },
+    },
+  });
+
+  if (existingMembership) {
+    return {
+      orgId: existingMembership.orgId,
+      name: existingMembership.organization.name,
+      status: existingMembership.status,
+      hasUnreadInbox: false,
+      unreadCount: 0,
+    };
+  }
+
+  const organization = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+    const createdOrganization = await tx.organization.create({
+      data: {
+        name: getDefaultWorkspaceName(sessionUser),
+        ownerId: dbUser.id,
+        inviteCode: crypto.randomUUID(),
+      },
+      select: {
+        id: true,
+        name: true,
+      },
+    });
+
+    await tx.orgMember.create({
+      data: {
+        orgId: createdOrganization.id,
+        userId: dbUser.id,
+        role: "ADMIN",
+        status: "ACTIVE",
+      },
+    });
+
+    const defaultTeam = await tx.team.create({
+      data: {
+        orgId: createdOrganization.id,
+        name: "Default Team",
+        description: "Default team for the workspace",
+        isDefault: true,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    await tx.teamMember.create({
+      data: {
+        orgId: createdOrganization.id,
+        teamId: defaultTeam.id,
+        userId: dbUser.id,
+        role: "LEAD",
+      },
+    });
+
+    await tx.orgInboxState.create({
+      data: {
+        orgId: createdOrganization.id,
+        userId: dbUser.id,
+      },
+    });
+
+    return createdOrganization;
+  });
+
+  return {
+    orgId: organization.id,
+    name: organization.name,
+    status: "ACTIVE",
+    hasUnreadInbox: false,
+    unreadCount: 0,
+  };
 }

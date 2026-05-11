@@ -52,6 +52,7 @@ interface ToolbarProps {
   nodes: Node[];
   edges: Edge[];
   onOrganizeApply: (positions: Array<{ nodeId: string; x: number; y: number }>) => void;
+  onPendingSaveChange?: (delta: number) => void;
 }
 
 export function Toolbar({
@@ -69,6 +70,7 @@ export function Toolbar({
   nodes,
   edges,
   onOrganizeApply,
+  onPendingSaveChange,
 }: ToolbarProps) {
   const [addNodeOpen, setAddNodeOpen] = useState(false);
   const [addEdgeOpen, setAddEdgeOpen] = useState(false);
@@ -129,12 +131,12 @@ export function Toolbar({
   };
 
   return (
-    <div className="absolute left-4 right-4 top-4 z-10 flex flex-col gap-3 rounded-xl bg-white/80 backdrop-blur-md p-3 shadow-lg border border-slate-200">
+    <div className="absolute left-2 right-2 top-2 z-10 flex max-h-[calc(100%-1rem)] flex-col gap-2 overflow-y-auto rounded-lg border border-slate-200 bg-white/90 p-2 shadow-lg backdrop-blur-md sm:left-4 sm:right-4 sm:top-4 sm:max-h-none sm:gap-3 sm:rounded-xl sm:p-3">
       {/* Single Row: Actions on Left, Filters on Right */}
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         {/* Left Side: Actions */}
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2">
+        <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3">
+          <div className="flex flex-wrap items-center gap-2">
             <Button
               size="sm"
               onClick={() => setAddNodeOpen(true)}
@@ -154,10 +156,10 @@ export function Toolbar({
             </Button>
           </div>
 
-          <div className="h-6 w-px bg-slate-200" />
+          <div className="hidden h-6 w-px bg-slate-200 sm:block" />
 
           {/* AI Features */}
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <Button
               size="sm"
               variant="outline"
@@ -178,23 +180,23 @@ export function Toolbar({
             </Button>
           </div>
 
-          <div className="h-6 w-px bg-slate-200" />
+          <div className="hidden h-6 w-px bg-slate-200 sm:block" />
 
-          <div className="relative group">
+          <div className="group relative min-w-[180px] flex-1 sm:flex-none">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
             <Input
               placeholder="Search nodes..."
               value={searchQuery}
               onChange={(e) => onSearchChange(e.target.value)}
-              className="h-8 pl-9 bg-slate-50 border-transparent focus:bg-white focus:border-blue-200 transition-all text-sm w-full max-w-[300px]"
+              className="h-8 w-full bg-slate-50 pl-9 text-sm transition-all border-transparent focus:bg-white focus:border-blue-200 sm:w-[260px]"
             />
           </div>
         </div>
 
         {/* Right Side: All Filters */}
-        <div className="flex flex-col gap-2 items-end">
+        <div className="flex w-full flex-col items-stretch gap-2 sm:w-auto sm:items-end">
           {/* Top: Person Filter + Status Filter + Clear */}
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             {/* Person Filter */}
             <Select
               value={selectedUserIds.length === 1 ? selectedUserIds[0] : selectedUserIds.length > 0 ? "MULTIPLE" : "ALL"}
@@ -206,7 +208,7 @@ export function Toolbar({
                 }
               }}
             >
-              <SelectTrigger className="h-8 w-[140px] bg-slate-50 border-transparent transition-all hover:bg-slate-100">
+              <SelectTrigger className="h-8 min-w-[140px] flex-1 bg-slate-50 border-transparent transition-all hover:bg-slate-100 sm:w-[140px] sm:flex-none">
                 <div className="flex items-center gap-2">
                   <Users2 className="h-3.5 w-3.5 text-slate-500" />
                   <SelectValue placeholder="All People">
@@ -226,7 +228,7 @@ export function Toolbar({
 
             {/* Status Filter */}
             <Select value={filterStatus} onValueChange={onFilterChange}>
-              <SelectTrigger className="h-8 w-[130px] bg-slate-50 border-transparent transition-all hover:bg-slate-100">
+              <SelectTrigger className="h-8 min-w-[130px] flex-1 bg-slate-50 border-transparent transition-all hover:bg-slate-100 sm:w-[130px] sm:flex-none">
                 <div className="flex items-center gap-2">
                   <Filter className="h-3.5 w-3.5 text-slate-500" />
                   <SelectValue placeholder="Status" />
@@ -262,7 +264,7 @@ export function Toolbar({
                 variant="ghost"
                 size="sm"
                 onClick={clearAllFilters}
-                className="h-8 text-slate-500 hover:text-red-500 hover:bg-red-50"
+                className="h-8 flex-1 text-slate-500 hover:text-red-500 hover:bg-red-50 sm:flex-none"
               >
                 <X className="h-3.5 w-3.5 mr-1" />
                 Clear
@@ -272,7 +274,7 @@ export function Toolbar({
 
           {/* Bottom: Person/Team Filter Badges */}
           {teams.length > 0 && (
-            <div className="flex flex-wrap gap-1.5 justify-end max-w-[400px]">
+            <div className="flex max-w-full flex-wrap gap-1.5 sm:max-w-[400px] sm:justify-end">
               {teams.map((team) => (
                 <Badge
                   key={team.id}
@@ -305,6 +307,7 @@ export function Toolbar({
           onDataChange();
           setAddNodeOpen(false);
         }}
+        onPendingSaveChange={onPendingSaveChange}
       />
 
       <AddEdgeDialog
