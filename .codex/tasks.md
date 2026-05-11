@@ -1,6 +1,7 @@
 # Tasks
 
 - [x] Improve mobile dashboard UI with a top app bar, drawer navigation, and responsive workspace/project/graph/settings/inbox surfaces.
+- [ ] Deploy the clean committed May 11 dashboard, graph, and root-route changes to Vercel production after explicit approval.
 - [ ] Deploy the root login/main redirect fix to Vercel production after explicit approval to ship the current dirty worktree, or after preparing an isolated deploy scope.
 - [ ] Deploy the closed-state graph handle anchor fix after confirming whether the completed Analyze removal should ship in the same production deploy.
 - [x] Improve nested-node drag-in/out UX with live animated drop targets and outside-parent detach.
