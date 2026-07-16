@@ -26,14 +26,16 @@ export default function ProjectLayout({ children }: { children: React.ReactNode 
     ? "now"
     : pathname.includes("/graph")
       ? "graph"
-      : pathname.includes("/inbox")
-        ? "inbox"
-        : pathname === "/"
-          ? "projects"
-          : "now";
+      : pathname.includes("/ai")
+        ? "ai"
+        : pathname.includes("/inbox")
+          ? "inbox"
+          : pathname === "/"
+            ? "projects"
+            : "now";
 
   return (
-    <div className="flex h-full min-h-0 flex-col">
+    <div className="flex flex-col h-screen">
       {/* Project Header */}
       {projectData && (
         <ProjectHeader
@@ -43,7 +45,7 @@ export default function ProjectLayout({ children }: { children: React.ReactNode 
         />
       )}
 
-      <div className="container mx-auto flex-1 overflow-auto px-4 py-5 sm:py-8">
+      <div className="container mx-auto px-4 py-8 flex-1 overflow-auto">
         <Tabs value={currentTab} className="mb-6">
           <TabsList>
             <Link href="/">
@@ -54,6 +56,9 @@ export default function ProjectLayout({ children }: { children: React.ReactNode 
             </Link>
             <Link href={`/projects/${projectId}/graph`}>
               <TabsTrigger value="graph">Graph</TabsTrigger>
+            </Link>
+            <Link href={`/projects/${projectId}/ai`}>
+              <TabsTrigger value="ai">AI</TabsTrigger>
             </Link>
             <Link href={`/projects/${projectId}/inbox`}>
               <TabsTrigger value="inbox">Inbox</TabsTrigger>

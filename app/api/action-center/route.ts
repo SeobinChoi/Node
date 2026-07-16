@@ -108,7 +108,7 @@ export async function GET(req: Request) {
 
         // Sort: OWNER items first, then by dueAt, then by priority
         const myActions = myActionsNodes
-            .map((n) => mapNodeToDTO(n))
+            .map(mapNodeToDTO)
             .sort((a, b) => {
                 const aIsOwner = a.reasons?.includes("OWNER") ? 0 : 1;
                 const bIsOwner = b.reasons?.includes("OWNER") ? 0 : 1;
@@ -169,7 +169,7 @@ export async function GET(req: Request) {
             };
         };
 
-        const waiting = myWaitingNodes.map((n) => enrichWaitingNode(n));
+        const waiting = myWaitingNodes.map(enrichWaitingNode);
 
         // Blocking
         const blockingMap = new Map<string, {
@@ -182,7 +182,7 @@ export async function GET(req: Request) {
                 blockingMap.set(waitingOnMyNode.id, {
                     node: waitingOnMyNode,
                     blockedCount: 0,
-                    affectedProjects: new Set()
+                    affectedProjects: new Set<string>()
                 });
             }
             const entry = blockingMap.get(waitingOnMyNode.id);

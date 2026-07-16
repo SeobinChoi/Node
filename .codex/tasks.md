@@ -1,5 +1,13 @@
 # Tasks
 
+- [x] Run DB-backed functional e2e after local Docker/Postgres is available or explicit remote Supabase mutation is approved.
+- [x] Complete approved remote Supabase DB-backed e2e and Chrome browser verification after fixing route, dependency, and graph layout issues.
+- [x] Resolve remaining moderate npm audit advisories without force downgrades and re-run verification.
+- [x] Reduce remaining June 10 ESLint warnings to zero and re-run safe verification gates.
+- [x] Reduce June 10 lint warning debt and re-run safe browser/build/e2e verification.
+- [x] Restore runnable verification coverage and continue broad function checks.
+- [x] Verify local app public routes in the user's Chrome browser.
+- [x] Run multi-agent project health check with lint, smoke, build, e2e/browser, and deployment/repo review.
 - [x] Improve mobile dashboard UI with a top app bar, drawer navigation, and responsive workspace/project/graph/settings/inbox surfaces.
 - [x] Deploy the clean committed May 11 dashboard, graph, and root-route changes to Vercel production after explicit approval.
 - [x] Deploy the root login/main redirect fix to Vercel production after explicit approval to ship the current dirty worktree, or after preparing an isolated deploy scope.
@@ -8,6 +16,7 @@
 - [x] Remove the root `No workspaces yet` fallback by creating a personal workspace for authenticated users without one and redirecting them to projects.
 - [x] Fix graph edge handles to stay at the closed-node vertical center when nodes expand.
 - [x] Remove the node Analyze feature.
+- [x] Add public report-capture mock service at `/report-mock` and verify desktop/mobile screenshots.
 - [x] Keep inbox notifications visible after marking them read and deploy to Vercel production.
 - [x] Fix individual inbox notification mark-as-read action and deploy to Vercel production.
 - [x] Add one-click mark-all-read for visible inbox notifications.
@@ -88,3 +97,13 @@
 - [x] Clarify where the copied direct Supabase URI should be placed
 - [x] Clarify the next exact user steps after setting `DIRECT_URL`
 - [x] Diagnose the newly applied Vercel DB env values after the failed retry
+- [x] Add and deploy a public interactive Military AI sample-data demo at `/military-ai-demo`; verify lint, TypeScript, build, public Playwright smoke, local/deployed browser Generate/Save flow, production HTTP 200, and runtime logs.
+- [x] Add and deploy public sample-data service demos at `/ops-radar-demo`, `/admin-doc-demo`, and `/after-action-demo`; verify lint, TypeScript, build, public Playwright smoke, local/deployed browser actions, production HTTP 200, screenshots, and runtime logs.
+- [x] Redesign `/ops-radar-demo`, `/admin-doc-demo`, and `/after-action-demo` into distinct government/defense system UI patterns; redeploy production and verify lint, TypeScript, build, public smoke, desktop screenshots, and mobile widths.
+- [x] Tone down `/ops-radar-demo`, `/admin-doc-demo`, and `/after-action-demo` from AI/SaaS demo styling to flatter Korean public-sector 업무망 layouts; hide React Query Devtools by default, update public smoke expectations, redeploy production, and refresh screenshots.
+- [x] Replace unclear `전훈보고` wording in `/after-action-demo` with clearer `사후조치` / `회의·훈련 요약` labels; update public smoke expectations and project memory.
+- [x] Verify, redeploy, and recapture screenshots for the `/after-action-demo` wording patch using Vercel production readiness checks and headless Playwright after local lint/TypeScript/dev-server commands had hung.
+- [x] Analyze why graph nodes move after creating a node.
+- [x] Patch graph nodes to use frame-grid snapping and adjacent-cell auto-connection.
+- [x] Reduce verification risk for the graph frame-grid patch.
+- [ ] Decide whether the public sample-data demo routes should be committed/pushed as part of the current dirty military-report worktree or isolated before the next GitHub sync.

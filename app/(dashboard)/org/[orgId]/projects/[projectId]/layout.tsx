@@ -21,7 +21,7 @@ export default function ProjectLayout({ children }: { children: ReactNode }) {
   });
 
   return (
-    <div className="flex h-full min-h-0 flex-col">
+    <div className="flex flex-col h-screen">
       {/* Project Header */}
       {projectData && (
         <ProjectHeader
@@ -31,7 +31,7 @@ export default function ProjectLayout({ children }: { children: ReactNode }) {
         />
       )}
 
-      <div className="min-h-0 flex-1 overflow-hidden">
+      <div className="flex-1 overflow-hidden">
         {children}
       </div>
     </div>

@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/select";
 import { MultiSelectSearch, SelectItem as MultiSelectItem } from "@/components/ui/multi-select-search";
 import { GraphData, ManualStatus, NodeDTO, NodeType } from "@/types";
+import { snapGraphNodePosition } from "@/lib/utils/graph-grid";
 
 interface AddNodeDialogProps {
   projectId: string;
@@ -120,9 +121,12 @@ export function AddNodeDialog({ projectId, orgId, parentNodeId, parentNodeTitle,
     const selectedTeams = teamIds
       .map((id) => teams.find((team) => team.id === id))
       .filter((team): team is Team => Boolean(team));
-    const nodePosition = parentNodeId
-      ? { x: 48, y: 96 }
-      : initialPosition ?? { x: Math.random() * 800, y: Math.random() * 600 };
+    const nodePosition = snapGraphNodePosition(
+      parentNodeId
+        ? { x: 48, y: 96 }
+        : initialPosition ?? { x: Math.random() * 800, y: Math.random() * 600 },
+      { isChild: Boolean(parentNodeId) }
+    );
     const optimisticNode: NodeDTO = {
       id: tempId,
       orgId,

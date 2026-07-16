@@ -2,16 +2,15 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { requireAuth } from "@/lib/utils/auth";
 import { requireProjectView, requireProjectEdit } from "@/lib/utils/permissions";
-import { authOrPermissionErrorResponse } from "@/lib/utils/api-error-responses";
 import { createActivityLog } from "@/lib/utils/activity-log";
 import { triggerNodeAssignmentNotifications } from "@/lib/utils/notifications";
 import { assertWithinNodeLimit } from "@/lib/subscription";
+import { snapGraphNodePosition } from "@/lib/utils/graph-grid";
 import { z } from "zod";
 import { NodeType, ManualStatus } from "@/types";
 
 const CreateNodeSchema = z.object({
   title: z.string().min(1).max(200),
-  parentNodeId: z.string().optional().nullable(),
   description: z.string().optional().nullable(),
   type: z.nativeEnum(NodeType).default(NodeType.TASK),
   manualStatus: z.nativeEnum(ManualStatus).default(ManualStatus.TODO),
@@ -20,11 +19,19 @@ const CreateNodeSchema = z.object({
   team: z.string().optional().nullable(),
   teamIds: z.array(z.string()).optional(),
   priority: z.number().int().min(1).max(5).default(3),
-  positionX: z.number().optional(),
-  positionY: z.number().optional(),
   dueAt: z.string().datetime().optional().nullable(),
   phase: z.string().optional().nullable(),
+  parentNodeId: z.string().optional().nullable(),
+  positionX: z.number().optional(),
+  positionY: z.number().optional(),
 });
+
+function isForbiddenError(error: unknown) {
+  return error instanceof Error && (
+    error.message === "Not a member of this project" ||
+    error.message.startsWith("Not authorized")
+  );
+}
 
 // POST /api/projects/[projectId]/nodes - Create new node
 export async function POST(
@@ -59,17 +66,6 @@ export async function POST(
       return NextResponse.json({ error: "Project not found" }, { status: 404 });
     }
 
-    if (validated.parentNodeId) {
-      const parentNode = await prisma.node.findUnique({
-        where: { id: validated.parentNodeId },
-        select: { projectId: true },
-      });
-
-      if (!parentNode || parentNode.projectId !== projectId) {
-        return NextResponse.json({ error: "Parent node not found" }, { status: 404 });
-      }
-    }
-
     // Check if organization has reached node limit
     try {
       await assertWithinNodeLimit(project.orgId);
@@ -87,8 +83,27 @@ export async function POST(
     const ownerId = (validated.ownerId && validated.ownerId !== "unassigned") ? validated.ownerId : null;
     const teamId = (validated.team && validated.team !== "none") ? validated.team : null;
 
-    const initialX = validated.positionX ?? Math.random() * 800;
-    const initialY = validated.positionY ?? Math.random() * 600;
+    if (validated.parentNodeId) {
+      const parentNode = await prisma.node.findFirst({
+        where: {
+          id: validated.parentNodeId,
+          projectId,
+        },
+        select: { id: true },
+      });
+
+      if (!parentNode) {
+        return NextResponse.json({ error: "Parent node not found" }, { status: 400 });
+      }
+    }
+
+    const initialPosition = snapGraphNodePosition(
+      {
+        x: validated.positionX ?? Math.random() * 800,
+        y: validated.positionY ?? Math.random() * 600,
+      },
+      { isChild: Boolean(validated.parentNodeId) }
+    );
 
     // Use transaction to create node and increment nodeCount atomically
     const node = await prisma.$transaction(async (tx) => {
@@ -96,7 +111,6 @@ export async function POST(
         data: {
           orgId: project.orgId,
           projectId,
-          parentNodeId: validated.parentNodeId || null,
           title: validated.title,
           description: validated.description,
           type: validated.type,
@@ -106,8 +120,9 @@ export async function POST(
           priority: validated.priority,
           dueAt: validated.dueAt ? new Date(validated.dueAt) : null,
           phase: validated.phase,
-          positionX: initialX,
-          positionY: initialY,
+          parentNodeId: validated.parentNodeId || null,
+          positionX: initialPosition.x,
+          positionY: initialPosition.y,
           nodeTeams: {
             create: (validated.teamIds || (teamId ? [teamId] : [])).map(tid => ({ teamId: tid }))
           },
@@ -120,7 +135,6 @@ export async function POST(
           team: { select: { name: true } },
           nodeTeams: { include: { team: { select: { id: true, name: true } } } },
           nodeOwners: { include: { user: { select: { id: true, name: true } } } },
-          _count: { select: { childNodes: true } },
         },
       });
 
@@ -161,20 +175,24 @@ export async function POST(
         id: node.id,
         orgId: node.orgId,
         projectId: node.projectId,
-        parentNodeId: node.parentNodeId,
         title: node.title,
         description: node.description,
         type: node.type,
         manualStatus: node.manualStatus,
         ownerName: node.owner?.name || null,
+        parentNodeId: node.parentNodeId,
         teamId: node.teamId,
         teamName: node.team?.name || null,
         teams: node.nodeTeams.map((nt) => ({ id: nt.team.id, name: nt.team.name })),
         owners: node.nodeOwners.map((no) => ({ id: no.user.id, name: no.user.name })),
         priority: node.priority,
-        childCount: node._count.childNodes,
         dueAt: node.dueAt?.toISOString() || null,
         phase: node.phase,
+        positionX: node.positionX,
+        positionY: node.positionY,
+        commentCount: 0,
+        attachmentCount: 0,
+        childCount: 0,
         createdAt: node.createdAt.toISOString(),
         updatedAt: node.updatedAt.toISOString(),
       },
@@ -185,10 +203,16 @@ export async function POST(
       return NextResponse.json({ error: "Invalid input", details: error.flatten() }, { status: 400 });
     }
 
-    const authResponse = authOrPermissionErrorResponse(error);
-    if (authResponse) return authResponse;
+    if (error instanceof Error && error.message === "Unauthorized") {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    if (isForbiddenError(error)) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
 
     console.error("POST /api/projects/[projectId]/nodes error:", error);
+
     return NextResponse.json({ error: "Failed to create node" }, { status: 500 });
   }
 }

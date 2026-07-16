@@ -7,6 +7,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { SessionProvider } from "next-auth/react";
 
 export function Providers({ children }: { children: React.ReactNode }) {
+  const showReactQueryDevtools = process.env.NEXT_PUBLIC_REACT_QUERY_DEVTOOLS === "true";
   const [queryClient] = useState(
     () =>
       new QueryClient({
@@ -24,7 +25,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
       <QueryClientProvider client={queryClient}>
         {children}
         <Toaster />
-        <ReactQueryDevtools initialIsOpen={false} />
+        {showReactQueryDevtools ? <ReactQueryDevtools initialIsOpen={false} /> : null}
       </QueryClientProvider>
     </SessionProvider>
   );

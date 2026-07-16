@@ -101,7 +101,7 @@ export default function BillingPageClient({
             }
 
             if (data.url) {
-                window.location.href = data.url;
+                window.open(data.url, "_self");
             }
         } catch (error) {
             console.error("Checkout error:", error);
@@ -126,7 +126,7 @@ export default function BillingPageClient({
             }
 
             if (data.url) {
-                window.location.href = data.url;
+                window.open(data.url, "_self");
             }
         } catch (error) {
             console.error("Portal error:", error);
@@ -262,7 +262,7 @@ export default function BillingPageClient({
             <Card>
                 <CardHeader>
                     <CardTitle>Pro Plan Benefits</CardTitle>
-                    <CardDescription>Unlock the full potential of your organization&apos;s workspace</CardDescription>
+                    <CardDescription>Unlock the full potential of your organization</CardDescription>
                 </CardHeader>
                 <CardContent>
                     <ul className="space-y-2">

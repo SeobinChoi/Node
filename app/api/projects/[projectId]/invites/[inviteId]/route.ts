@@ -2,12 +2,19 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { requireAuth } from "@/lib/utils/auth";
 import { isProjectAdmin } from "@/lib/utils/permissions";
-import { Prisma } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
 
 interface RouteContext {
     params: Promise<{ projectId: string; inviteId: string }>;
+}
+
+function getPrismaErrorCode(error: unknown) {
+    if (typeof error !== "object" || error === null || !("code" in error)) {
+        return undefined;
+    }
+
+    return typeof error.code === "string" ? error.code : undefined;
 }
 
 // DELETE /api/projects/[projectId]/invites/[inviteId] - Revoke Invite
@@ -43,9 +50,7 @@ export async function DELETE(
 
         return NextResponse.json({ success: true });
     } catch (error) {
-        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025") {
-            return NextResponse.json({ success: true });
-        }
+        if (getPrismaErrorCode(error) === 'P2025') return NextResponse.json({ success: true });
         return NextResponse.json({ error: "Failed to revoke invite" }, { status: 500 });
     }
 }

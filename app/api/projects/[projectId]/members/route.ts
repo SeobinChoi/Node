@@ -2,7 +2,18 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { requireAuth } from "@/lib/utils/auth";
 import { requireProjectView } from "@/lib/utils/permissions";
-import { authOrPermissionErrorResponse } from "@/lib/utils/api-error-responses";
+
+type ProjectMemberDTO = {
+  id: string;
+  userId: string;
+  userName: string | null;
+  userEmail: string | null;
+  userImage: string | null;
+  teamId: string | null;
+  teamName: string | null;
+  role?: string;
+  isDirectMember?: boolean;
+};
 
 // GET /api/projects/[projectId]/members - Get project members
 export async function GET(
@@ -87,7 +98,7 @@ export async function GET(
     }));
 
     // Flatten and unique-ify members (a user could be in multiple teams)
-    const memberMap = new Map();
+    const memberMap = new Map<string, ProjectMemberDTO>();
 
     projectTeams.forEach((pt) => {
       pt.team.members.forEach((tm) => {
@@ -126,10 +137,12 @@ export async function GET(
       teams: teams,
     });
   } catch (error) {
-    const authResponse = authOrPermissionErrorResponse(error);
-    if (authResponse) return authResponse;
-
     console.error("GET /api/projects/[projectId]/members error:", error);
+
+    if (error instanceof Error && error.message === "Not a member of this project") {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
     return NextResponse.json({ error: "Failed to fetch members" }, { status: 500 });
   }
 }

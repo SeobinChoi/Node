@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { requireAuth } from "@/lib/utils/auth";
 import { isProjectAdmin } from "@/lib/utils/permissions";
-import { Prisma } from "@prisma/client";
 import { ProjectRole } from "@prisma/client";
 import { z } from "zod";
 
@@ -19,6 +18,14 @@ const UpdateTeamRoleSchema = z.object({
         ProjectRole.VIEWER
     ]),
 });
+
+function getPrismaErrorCode(error: unknown) {
+    if (typeof error !== "object" || error === null || !("code" in error)) {
+        return undefined;
+    }
+
+    return typeof error.code === "string" ? error.code : undefined;
+}
 
 // PATCH /api/projects/[projectId]/teams/[teamId] - Update team role
 export async function PATCH(
@@ -81,9 +88,7 @@ export async function DELETE(
 
         return NextResponse.json({ success: true });
     } catch (error) {
-        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025") {
-            return NextResponse.json({ success: true });
-        }
+        if (getPrismaErrorCode(error) === 'P2025') return NextResponse.json({ success: true });
         return NextResponse.json({ error: "Failed to remove team" }, { status: 500 });
     }
 }

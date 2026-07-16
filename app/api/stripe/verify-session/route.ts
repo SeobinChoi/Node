@@ -2,9 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db/prisma";
 import { stripe } from "@/lib/stripe";
-import Stripe from "stripe";
 
-type SubscriptionWithPeriod = Stripe.Subscription & {
+type SubscriptionWithPeriod = Awaited<ReturnType<NonNullable<typeof stripe>["subscriptions"]["retrieve"]>> & {
     current_period_end?: number | null;
 };
 

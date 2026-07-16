@@ -18,6 +18,7 @@
 - Task file uploads are stored outside markdown through Supabase Storage using the `node-attachments` bucket by default.
 - Nodes can now form a hierarchy through `nodes.parent_node_id`; the graph UI renders parent nodes as container blocks and supports animated grab-and-drop drag-in/out nesting, including outside-parent detach.
 - Graph node and edge creation uses optimistic UI updates first, then reconciles with the server; pending saves install browser/internal-link leave warnings.
+- Graph nodes now use a frame-grid placement model: created and dragged nodes snap to task-sized grid cells, and dropping a node in the immediately adjacent horizontal cell auto-creates a default `DEPENDS_ON` connection when one does not already exist.
 - Regular graph nodes measure the closed-card content height and keep left/right edge handles fixed at that closed-state vertical center, so selected-node expansion does not move edge anchors.
 - Graph node/edge deletion is immediate without native confirmation dialogs, and the most recent deletion can be restored with Ctrl/Cmd+Z through `/api/projects/[projectId]/graph/restore`.
 - The node-level Analyze button and `/api/ai/analyze-block` route are currently removed; other project-level AI generation/organize routes remain.
@@ -27,6 +28,8 @@
 - Default team identity is now a schema flag (`teams.isDefault`) instead of the literal name `"Default Team"`.
 - Dashboard org routes now render through `components/layout/DashboardShell.tsx`, which keeps the resizable desktop sidebar on medium screens and above while using a mobile top app bar plus left navigation drawer on small screens.
 - Core dashboard surfaces now have mobile-safe layouts for workspace home, projects, inbox, settings, project headers, graph toolbar/action bar, and task detail sheets.
+- The graph toolbar is part of the vertical graph layout instead of an absolute overlay, so toolbar controls no longer cover or intercept clicks on top-positioned graph nodes.
+- Report-capture mock service lives at `app/report-mock/page.tsx` as a public static route for the military-academic midterm report; it uses non-sensitive dummy data and does not touch DB/auth flows.
 
 ## Key decisions
 - Persistent project state is tracked in `.codex/project.md`, `.codex/tasks.md`, and `.codex/log.md`.
@@ -52,8 +55,13 @@
 - Task page bodies are stored as Markdown in `node_pages.content_markdown`; legacy `nodes.description` is only used as initial backfill content.
 - Task attachments require server-side Supabase Storage env vars: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, and optional `SUPABASE_STORAGE_BUCKET`.
 - Supabase project `ihmzppnyhcbrsviuficr` now has the task-collaboration DB migrations applied and the private `node-attachments` Storage bucket created.
-- ESLint currently treats legacy `any`, unescaped text, and React compiler debt as warnings so `npm run lint` remains a passing gate. Warning count is now 0 after targeted type cleanup and unused-code removal.
+- ESLint currently runs with zero warnings after the June 10 API DTO/mapping type cleanup; `npm run lint` is a passing zero-warning gate again.
+- npm audit is currently clean after targeted npm overrides pin `@prisma/dev`'s `@hono/node-server` transitive dependency to `1.19.13` and all `postcss` resolutions to `8.5.15`; these avoid npm's breaking `--force` downgrade path.
+- Next.js and `eslint-config-next` remain on stable `16.2.9`; avoid canary unless required because `next-auth@5.0.0-beta.30` rejects prerelease Next versions in its peer range.
 - Playwright uses bundled Chromium installed under `/Users/xavi/Library/Caches/ms-playwright/`; the global Codex Playwright MCP config was updated to point at that executable, but already-running Codex sessions may need restart before MCP browser tools reload the new setting.
 - Playwright webServer uses `next dev --webpack` because the Turbopack dev server can hang while compiling `/api/projects/[projectId]/invites`; production builds still use the default Next.js production build path.
 - New graph connections default to `DEPENDS_ON` without a creation-time relation picker; existing relation types are changed by clicking an existing edge and editing it.
 - Mobile dashboard navigation should use the top app bar plus drawer pattern; the desktop sidebar remains the primary desktop navigation.
+- `/report-mock` is a report/demo surface only and should stay separate from production task data, authentication, and persistence unless a later task explicitly promotes it.
+- `/military-ai-demo` is a public interactive sample-data demo for the military AI workflow. It is deployed at `https://node-ruddy-tau.vercel.app/military-ai-demo`, requires no login/OpenAI key/DB writes, and stays separate from the authenticated project-scoped Military AI Console and persistence APIs.
+- `/ops-radar-demo`, `/admin-doc-demo`, and `/after-action-demo` are public interactive sample-data demos for operations radar, administrative drafting, and meeting/training after-action weekly rollup evidence. They are deployed under `https://node-ruddy-tau.vercel.app`, require no login/OpenAI key/DB writes, and stay separate from authenticated project data and persistence APIs. Their UI patterns were toned down on 2026-07-03 from AI/SaaS demo styling to flatter Korean public-sector 업무망 styles: defense situation board, official document service portal, and green notice/report board. The After Action screen should use clearer Korean wording such as `사후조치` and `회의·훈련 요약`, not the unclear `전훈보고` label. React Query Devtools are hidden by default unless `NEXT_PUBLIC_REACT_QUERY_DEVTOOLS=true` so public captures do not include a floating developer-tools button.

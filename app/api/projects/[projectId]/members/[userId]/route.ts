@@ -3,7 +3,7 @@ import { prisma } from "@/lib/db/prisma";
 import { requireAuth } from "@/lib/utils/auth";
 import { isProjectAdmin } from "@/lib/utils/permissions";
 import { z } from "zod";
-import { Prisma, ProjectRole } from "@prisma/client";
+import { ProjectRole } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
 
@@ -18,6 +18,14 @@ const UpdateRoleSchema = z.object({
         ProjectRole.VIEWER
     ]),
 });
+
+function getPrismaErrorCode(error: unknown) {
+    if (typeof error !== "object" || error === null || !("code" in error)) {
+        return undefined;
+    }
+
+    return typeof error.code === "string" ? error.code : undefined;
+}
 
 // PATCH /api/projects/[projectId]/members/[userId] - Update member role
 export async function PATCH(
@@ -117,7 +125,7 @@ export async function DELETE(
         return NextResponse.json({ success: true });
     } catch (error) {
         // Handle "Record to delete does not exist" gracefully
-        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025") {
+        if (getPrismaErrorCode(error) === 'P2025') {
             return NextResponse.json({ success: true }); // Idempotent
         }
 

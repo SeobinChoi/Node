@@ -27,6 +27,13 @@ import { NodeDetailSheet } from "./NodeDetailSheet";
 import { useDeleteNode } from "@/hooks/use-node-mutations";
 import { useSession } from "next-auth/react";
 import {
+  GRAPH_GRID_COLUMN_WIDTH,
+  GRAPH_GRID_ROW_HEIGHT,
+  GRAPH_NODE_HEIGHT,
+  GRAPH_NODE_WIDTH,
+  snapGraphNodePosition,
+} from "@/lib/utils/graph-grid";
+import {
   Dialog,
   DialogContent,
   DialogHeader,
@@ -71,8 +78,8 @@ const nodeTypes = {
   custom: CustomNode,
 };
 
-const nodeWidth = 240;
-const nodeHeight = 120;
+const nodeWidth = GRAPH_NODE_WIDTH;
+const nodeHeight = GRAPH_NODE_HEIGHT;
 const containerMinWidth = 340;
 const containerMinHeight = 190;
 const containerPadding = 32;
@@ -183,6 +190,75 @@ function getNodeCenter(rect: { x: number; y: number; width: number; height: numb
     x: rect.x + rect.width / 2,
     y: rect.y + rect.height / 2,
   };
+}
+
+function toFlowEdge(edge: EdgeDTO): Edge {
+  const isForward = edge.relation === "HANDOFF_TO";
+
+  return {
+    id: edge.id,
+    source: isForward ? edge.fromNodeId : edge.toNodeId,
+    target: isForward ? edge.toNodeId : edge.fromNodeId,
+    type: "default",
+    label: edge.relation.replace(/_/g, " "),
+    pathOptions: graphEdgePathOptions,
+    markerEnd: {
+      type: MarkerType.ArrowClosed,
+      color: "#64748b",
+    },
+    style: graphEdgeStyle,
+    data: { originalEdge: edge },
+  };
+}
+
+function hasDependencyBetween(edges: EdgeDTO[], firstNodeId: string, secondNodeId: string) {
+  return edges.some(
+    (edge) =>
+      edge.relation === EdgeRelation.DEPENDS_ON &&
+      ((edge.fromNodeId === firstNodeId && edge.toNodeId === secondNodeId) ||
+        (edge.fromNodeId === secondNodeId && edge.toNodeId === firstNodeId))
+  );
+}
+
+function findFrameAdjacentConnection(
+  draggedNodeId: string,
+  parentNodeId: string | null,
+  position: { x: number; y: number },
+  allNodes: Node[],
+  graphEdges: EdgeDTO[]
+) {
+  const siblingNodes = allNodes.filter(
+    (candidate) =>
+      candidate.id !== draggedNodeId &&
+      (candidate.parentNode || null) === parentNodeId
+  );
+  const snappedPosition = snapGraphNodePosition(position, { isChild: Boolean(parentNodeId) });
+
+  const adjacentConnection = siblingNodes
+    .map((candidate) => {
+      const candidatePosition = snapGraphNodePosition(candidate.position, {
+        isChild: Boolean(parentNodeId),
+      });
+      const sameRow = Math.abs(candidatePosition.y - snappedPosition.y) < 1;
+      const columnDelta = snappedPosition.x - candidatePosition.x;
+      const isAdjacentColumn = Math.abs(Math.abs(columnDelta) - GRAPH_GRID_COLUMN_WIDTH) < 1;
+
+      if (!sameRow || !isAdjacentColumn) return null;
+      if (hasDependencyBetween(graphEdges, draggedNodeId, candidate.id)) return null;
+
+      return columnDelta > 0
+        ? {
+            fromNodeId: draggedNodeId,
+            toNodeId: candidate.id,
+          }
+        : {
+            fromNodeId: candidate.id,
+            toNodeId: draggedNodeId,
+          };
+    })
+    .filter((connection): connection is { fromNodeId: string; toNodeId: string } => Boolean(connection))[0];
+
+  return adjacentConnection ?? null;
 }
 
 function findHierarchyDropTarget(draggedNode: Node, allNodes: Node[], nodeById: Map<string, NodeDTO>) {
@@ -321,6 +397,26 @@ async function persistNodeFrame(nodeId: string, parentNodeId: string | null, x: 
     const errorData = await res.json().catch(() => ({}));
     throw new Error(errorData.error || `Failed to save node (${res.status})`);
   }
+}
+
+async function persistDependencyEdge(projectId: string, fromNodeId: string, toNodeId: string) {
+  const res = await fetch(`/api/projects/${projectId}/edges`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      fromNodeId,
+      toNodeId,
+      relation: EdgeRelation.DEPENDS_ON,
+    }),
+  });
+
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    if (errorData.error === "Edge already exists") return null;
+    throw new Error(errorData.error || `Failed to create connection (${res.status})`);
+  }
+
+  return res.json() as Promise<Partial<EdgeDTO>>;
 }
 
 const getLayoutedElements = (nodes: Node[], edges: Edge[], direction = "LR") => {
@@ -499,23 +595,7 @@ export function GraphCanvas({ projectId, orgId, data, onDataChange, focusNodeId 
     const visibleNodeIds = new Set(initialNodes.map((n) => n.id));
     const initialEdges: Edge[] = data.edges
       .filter((edge) => visibleNodeIds.has(edge.fromNodeId) && visibleNodeIds.has(edge.toNodeId))
-      .map((edge) => {
-        const isForward = edge.relation === "HANDOFF_TO";
-        return {
-          id: edge.id,
-          source: isForward ? edge.fromNodeId : edge.toNodeId,
-          target: isForward ? edge.toNodeId : edge.fromNodeId,
-          type: "default",
-          label: edge.relation.replace(/_/g, " "),
-          pathOptions: graphEdgePathOptions,
-          markerEnd: {
-            type: MarkerType.ArrowClosed,
-            color: "#64748b",
-          },
-          style: graphEdgeStyle,
-          data: { originalEdge: edge },
-        };
-      });
+      .map(toFlowEdge);
 
     // Apply positions: use saved positions or auto-layout
     const { nodes, edges } = (() => {
@@ -989,29 +1069,36 @@ export function GraphCanvas({ projectId, orgId, data, onDataChange, focusNodeId 
       const nextPosition = (() => {
         if (dropTarget && parentChanged) {
           const targetAbsolute = getAbsoluteNodePosition(dropTarget, currentNodes);
-          return {
+          return snapGraphNodePosition({
             x: Math.max(containerPadding, draggedAbsolute.x - targetAbsolute.x),
             y: Math.max(containerHeaderHeight, draggedAbsolute.y - targetAbsolute.y),
-          };
+          }, { isChild: true });
         }
 
         if (shouldDetach) {
-          return draggedAbsolute;
+          return snapGraphNodePosition(draggedAbsolute);
         }
 
         if (!parentChanged && draggedDto.parentNodeId) {
-          return {
+          return snapGraphNodePosition({
             x: Math.max(containerPadding, node.position.x),
             y: Math.max(containerHeaderHeight, node.position.y),
-          };
+          }, { isChild: true });
         }
 
         if (!parentChanged) {
-          return node.position;
+          return snapGraphNodePosition(node.position, { isChild: Boolean(nextParentId) });
         }
 
-        return draggedAbsolute;
+        return snapGraphNodePosition(draggedAbsolute, { isChild: Boolean(nextParentId) });
       })();
+      const frameConnection = findFrameAdjacentConnection(
+        node.id,
+        nextParentId,
+        nextPosition,
+        currentNodes,
+        data.edges
+      );
       const previousGraphData = queryClient.getQueryData<GraphData>(["graph", projectId]);
 
       setDragHierarchyFeedback({ draggingNodeId: null, dropTargetNodeId: null, isDetaching: false });
@@ -1036,6 +1123,41 @@ export function GraphCanvas({ projectId, orgId, data, onDataChange, focusNodeId 
       beginSaving();
       try {
         await persistNodeFrame(node.id, nextParentId, nextPosition.x, nextPosition.y);
+        if (frameConnection) {
+          try {
+            const savedEdge = await persistDependencyEdge(
+              projectId,
+              frameConnection.fromNodeId,
+              frameConnection.toNodeId
+            );
+
+            if (savedEdge?.id) {
+              const edgeDto: EdgeDTO = {
+                id: savedEdge.id,
+                orgId,
+                projectId,
+                fromNodeId: frameConnection.fromNodeId,
+                toNodeId: frameConnection.toNodeId,
+                relation: EdgeRelation.DEPENDS_ON,
+                createdAt: savedEdge.createdAt || new Date().toISOString(),
+              };
+
+              queryClient.setQueryData<GraphData>(["graph", projectId], (old) => {
+                if (!old || hasDependencyBetween(old.edges, edgeDto.fromNodeId, edgeDto.toNodeId)) return old;
+                return { ...old, edges: [...old.edges, edgeDto] };
+              });
+              setEdges((currentEdges) =>
+                currentEdges.some((edge) => edge.id === edgeDto.id)
+                  ? currentEdges
+                  : [...currentEdges, toFlowEdge(edgeDto)]
+              );
+              toast.success("Node snapped and connected");
+              onDataChange();
+            }
+          } catch (error) {
+            toast.error(error instanceof Error ? error.message : "Node snapped, but connection failed");
+          }
+        }
         if (parentChanged && dropTarget) {
           toast.success(`Moved inside ${data.nodes.find((n) => n.id === dropTarget.id)?.title || "node"}`);
           onDataChange();
@@ -1055,7 +1177,7 @@ export function GraphCanvas({ projectId, orgId, data, onDataChange, focusNodeId 
         finishSaving(succeeded);
       }
     },
-    [beginSaving, data.nodes, finishSaving, nodes, projectId, queryClient, onDataChange, setNodes]
+    [beginSaving, data.edges, data.nodes, finishSaving, nodes, onDataChange, orgId, projectId, queryClient, setEdges, setNodes]
   );
 
   const createDeletionSnapshot = useCallback(
@@ -1302,7 +1424,7 @@ export function GraphCanvas({ projectId, orgId, data, onDataChange, focusNodeId 
       />
 
       {/* Canvas (full remaining height) */}
-      <div className="flex-1 relative" onClick={() => setContextMenu(null)}>
+      <div className="flex min-h-0 flex-1 flex-col" onClick={() => setContextMenu(null)}>
         <Toolbar
           orgId={orgId}
           projectId={projectId}
@@ -1320,7 +1442,8 @@ export function GraphCanvas({ projectId, orgId, data, onDataChange, focusNodeId 
           onOrganizeApply={handleOrganizeApply}
           onPendingSaveChange={changePendingSaveCount}
         />
-        <ReactFlow
+        <div className="relative min-h-0 flex-1">
+          <ReactFlow
           nodes={visibleNodes}
           edges={edges}
           onNodesChange={onNodesChange}
@@ -1342,7 +1465,7 @@ export function GraphCanvas({ projectId, orgId, data, onDataChange, focusNodeId 
           connectionLineStyle={graphEdgeStyle}
           fitView
           snapToGrid
-          snapGrid={[15, 15]}
+          snapGrid={[GRAPH_GRID_COLUMN_WIDTH, GRAPH_GRID_ROW_HEIGHT]}
           onPaneContextMenu={(event) => {
             event.preventDefault();
             const flowPosition = reactFlowInstanceRef.current?.screenToFlowPosition({
@@ -1361,55 +1484,56 @@ export function GraphCanvas({ projectId, orgId, data, onDataChange, focusNodeId 
             setContextMenu(null);
             clearSelection();
           }}
-        >
-          <Background color="#f1f5f9" gap={15} />
-          <Controls />
-          <MiniMap className="hidden sm:block" nodeStrokeColor="#e2e8f0" nodeColor="#f8fafc" />
-        </ReactFlow>
+          >
+            <Background color="#f1f5f9" gap={15} />
+            <Controls />
+            <MiniMap className="hidden sm:block" nodeStrokeColor="#e2e8f0" nodeColor="#f8fafc" />
+          </ReactFlow>
 
-        {/* Empty State */}
-        {data.nodes.length === 0 && (
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-xl border border-slate-200 p-8 text-center max-w-md pointer-events-auto">
-              <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gradient-to-br from-blue-100 to-indigo-100 flex items-center justify-center">
-                <svg className="w-8 h-8 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                </svg>
+          {/* Empty State */}
+          {data.nodes.length === 0 && (
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+              <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-xl border border-slate-200 p-8 text-center max-w-md pointer-events-auto">
+                <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gradient-to-br from-blue-100 to-indigo-100 flex items-center justify-center">
+                  <svg className="w-8 h-8 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                  </svg>
+                </div>
+                <h3 className="text-xl font-semibold text-slate-800 mb-2">No nodes yet</h3>
+                <p className="text-slate-500 text-sm mb-6">
+                  Right-click anywhere on the canvas to add your first node,
+                  or click the button below to get started.
+                </p>
+                <Button
+                  onClick={() => {
+                    setAddNodeParent(null);
+                    setAddNodePosition(null);
+                    setAddNodeOpen(true);
+                  }}
+                  className="bg-blue-600 hover:bg-blue-700 text-white shadow-md"
+                >
+                  <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                  </svg>
+                  Add First Node
+                </Button>
               </div>
-              <h3 className="text-xl font-semibold text-slate-800 mb-2">No nodes yet</h3>
-              <p className="text-slate-500 text-sm mb-6">
-                Right-click anywhere on the canvas to add your first node,
-                or click the button below to get started.
-              </p>
-              <Button
-                onClick={() => {
-                  setAddNodeParent(null);
-                  setAddNodePosition(null);
-                  setAddNodeOpen(true);
-                }}
-                className="bg-blue-600 hover:bg-blue-700 text-white shadow-md"
-              >
-                <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                </svg>
-                Add First Node
-              </Button>
             </div>
-          </div>
-        )}
+          )}
 
-        {/* Context Menu */}
-        {contextMenu && (
-          <CanvasContextMenu
-            position={contextMenu}
-            onClose={() => setContextMenu(null)}
-            onAddNode={(x, y) => {
-              setAddNodeParent(null);
-              setAddNodePosition({ x, y });
-              setAddNodeOpen(true);
-            }}
-          />
-        )}
+          {/* Context Menu */}
+          {contextMenu && (
+            <CanvasContextMenu
+              position={contextMenu}
+              onClose={() => setContextMenu(null)}
+              onAddNode={(x, y) => {
+                setAddNodeParent(null);
+                setAddNodePosition(snapGraphNodePosition({ x, y }));
+                setAddNodeOpen(true);
+              }}
+            />
+          )}
+        </div>
       </div>
 
       {/* Add Node Dialog */}

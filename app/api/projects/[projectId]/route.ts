@@ -2,13 +2,20 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { requireAuth } from "@/lib/utils/auth";
 import { requireProjectView, requireProjectEdit } from "@/lib/utils/permissions";
-import { authOrPermissionErrorResponse } from "@/lib/utils/api-error-responses";
 import { z } from "zod";
 
 const UpdateProjectSchema = z.object({
   name: z.string().min(1).optional(),
   description: z.string().optional(),
 });
+
+type ProjectMemberDTO = {
+  id: string;
+  userId: string;
+  userName: string | null;
+  userEmail: string | null;
+  team: string;
+};
 
 // GET /api/projects/[projectId] - Get project details
 export async function GET(
@@ -51,7 +58,7 @@ export async function GET(
     }
 
     // Flatten and unique-ify members
-    const memberMap = new Map();
+    const memberMap = new Map<string, ProjectMemberDTO>();
     project.projectTeams.forEach((pt) => {
       pt.team.members.forEach((tm) => {
         if (!memberMap.has(tm.userId)) {
@@ -73,10 +80,12 @@ export async function GET(
       members: Array.from(memberMap.values()),
     });
   } catch (error) {
-    const authResponse = authOrPermissionErrorResponse(error);
-    if (authResponse) return authResponse;
-
     console.error("GET /api/projects/[projectId] error:", error);
+
+    if (error instanceof Error && error.message === "Not a member of this project") {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
     return NextResponse.json({ error: "Failed to fetch project" }, { status: 500 });
   }
 }
@@ -139,8 +148,6 @@ export async function PATCH(
 
     return NextResponse.json({ project: updatedProject });
   } catch (error) {
-    const authResponse = authOrPermissionErrorResponse(error);
-    if (authResponse) return authResponse;
     console.error("PATCH /api/projects/[projectId] error:", error);
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
   }
@@ -173,8 +180,6 @@ export async function DELETE(
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    const authResponse = authOrPermissionErrorResponse(error);
-    if (authResponse) return authResponse;
     console.error("DELETE /api/projects/[projectId] error:", error);
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
   }

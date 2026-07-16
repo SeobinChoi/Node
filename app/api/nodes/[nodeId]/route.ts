@@ -2,16 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { requireAuth } from "@/lib/utils/auth";
 import { requireProjectView, requireProjectEdit } from "@/lib/utils/permissions";
-import { authOrPermissionErrorResponse } from "@/lib/utils/api-error-responses";
 import { createActivityLog } from "@/lib/utils/activity-log";
 import { z } from "zod";
 import { NodeType, ManualStatus } from "@/types";
 import { triggerUnblockedNotifications, createNotification, triggerNodeAssignmentNotifications } from "@/lib/utils/notifications";
-import { Prisma } from "@prisma/client";
 
 const UpdateNodeSchema = z.object({
   title: z.string().min(1).max(200).optional(),
-  parentNodeId: z.string().nullable().optional(),
   description: z.string().optional(),
   type: z.nativeEnum(NodeType).optional(),
   manualStatus: z.nativeEnum(ManualStatus).optional(),
@@ -23,24 +20,22 @@ const UpdateNodeSchema = z.object({
   dueAt: z.string().datetime().nullable().optional(),
   positionX: z.number().optional(),
   positionY: z.number().optional(),
+  parentNodeId: z.string().nullable().optional(),
 });
 
-async function wouldCreateHierarchyCycle(nodeId: string, parentNodeId: string) {
-  let currentParentId: string | null = parentNodeId;
+function normalizeParentNodeId(parentNodeId: string | null | undefined) {
+  return parentNodeId === "" ? null : parentNodeId;
+}
 
-  while (currentParentId) {
-    if (currentParentId === nodeId) {
-      return true;
-    }
+function isForbiddenError(error: unknown) {
+  return error instanceof Error && (
+    error.message === "Not a member of this project" ||
+    error.message.startsWith("Not authorized")
+  );
+}
 
-    const parent: { parentNodeId: string | null } | null = await prisma.node.findUnique({
-      where: { id: currentParentId },
-      select: { parentNodeId: true },
-    });
-    currentParentId = parent?.parentNodeId ?? null;
-  }
-
-  return false;
+function isRecordNotFoundError(error: unknown) {
+  return typeof error === "object" && error !== null && "code" in error && error.code === "P2025";
 }
 
 // PATCH /api/nodes/[nodeId] - Update node
@@ -71,21 +66,6 @@ export async function PATCH(
 
     await requireProjectEdit(existingNode.projectId, user.id);
 
-    if (validated.parentNodeId !== undefined && validated.parentNodeId !== null) {
-      const parentNode = await prisma.node.findUnique({
-        where: { id: validated.parentNodeId },
-        select: { projectId: true },
-      });
-
-      if (!parentNode || parentNode.projectId !== existingNode.projectId) {
-        return NextResponse.json({ error: "Parent node not found" }, { status: 404 });
-      }
-
-      if (await wouldCreateHierarchyCycle(nodeId, validated.parentNodeId)) {
-        return NextResponse.json({ error: "A node cannot contain itself or one of its ancestors" }, { status: 400 });
-      }
-    }
-
     // Verify all new owners are project members
     if (validated.ownerIds) {
       for (const oid of validated.ownerIds) {
@@ -95,12 +75,39 @@ export async function PATCH(
       await requireProjectView(existingNode.projectId, validated.ownerId);
     }
 
+    const nextParentNodeId = normalizeParentNodeId(validated.parentNodeId);
+
+    if (validated.parentNodeId !== undefined) {
+      if (nextParentNodeId === nodeId) {
+        return NextResponse.json({ error: "Node cannot be its own parent" }, { status: 400 });
+      }
+
+      if (nextParentNodeId) {
+        const projectNodes = await prisma.node.findMany({
+          where: { projectId: existingNode.projectId },
+          select: { id: true, parentNodeId: true },
+        });
+        const parentByNodeId = new Map(projectNodes.map((node) => [node.id, node.parentNodeId]));
+
+        if (!parentByNodeId.has(nextParentNodeId)) {
+          return NextResponse.json({ error: "Parent node not found" }, { status: 400 });
+        }
+
+        let ancestorId: string | null | undefined = nextParentNodeId;
+        while (ancestorId) {
+          if (ancestorId === nodeId) {
+            return NextResponse.json({ error: "Node hierarchy cannot contain cycles" }, { status: 400 });
+          }
+          ancestorId = parentByNodeId.get(ancestorId);
+        }
+      }
+    }
+
     // Update node
     const node = await prisma.node.update({
       where: { id: nodeId },
       data: {
         ...(validated.title !== undefined && { title: validated.title }),
-        ...(validated.parentNodeId !== undefined && { parentNodeId: validated.parentNodeId }),
         ...(validated.description !== undefined && { description: validated.description }),
         ...(validated.type !== undefined && { type: validated.type }),
         ...(validated.manualStatus !== undefined && { manualStatus: validated.manualStatus }),
@@ -112,6 +119,7 @@ export async function PATCH(
         }),
         ...(validated.positionX !== undefined && { positionX: validated.positionX }),
         ...(validated.positionY !== undefined && { positionY: validated.positionY }),
+        ...(validated.parentNodeId !== undefined && { parentNodeId: nextParentNodeId }),
         ...(validated.teamIds !== undefined && {
           nodeTeams: {
             deleteMany: {},
@@ -130,7 +138,6 @@ export async function PATCH(
         team: { select: { name: true } },
         nodeTeams: { include: { team: { select: { id: true, name: true } } } },
         nodeOwners: { include: { user: { select: { id: true, name: true } } } },
-        _count: { select: { childNodes: true } },
       },
     });
 
@@ -217,18 +224,17 @@ export async function PATCH(
       id: node.id,
       orgId: node.orgId,
       projectId: node.projectId,
-      parentNodeId: node.parentNodeId,
       title: node.title,
       description: node.description,
       type: node.type,
       manualStatus: node.manualStatus,
       ownerId: node.ownerId,
       ownerName: node.owner?.name || null,
+      parentNodeId: node.parentNodeId,
       teamId: node.teamId,
       teamName: node.team?.name || null,
       teams: node.nodeTeams.map((nt) => ({ id: nt.team.id, name: nt.team.name })),
       owners: node.nodeOwners.map((no) => ({ id: no.user.id, name: no.user.name })),
-      childCount: node._count.childNodes,
       priority: node.priority,
       dueAt: node.dueAt?.toISOString() || null,
       createdAt: node.createdAt.toISOString(),
@@ -239,13 +245,20 @@ export async function PATCH(
       return NextResponse.json({ error: "Invalid input", details: error.flatten() }, { status: 400 });
     }
 
-    const authResponse = authOrPermissionErrorResponse(error);
-    if (authResponse) return authResponse;
-    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025") {
+    if (error instanceof Error && error.message === "Unauthorized") {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    if (isForbiddenError(error)) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
+    if (isRecordNotFoundError(error)) {
       return NextResponse.json({ error: "Node not found" }, { status: 404 });
     }
 
     console.error("PATCH /api/nodes/[nodeId] error:", error);
+
     return NextResponse.json({ error: "Failed to update node" }, { status: 500 });
   }
 }
@@ -265,13 +278,12 @@ export async function DELETE(
     });
 
     if (!existingNode) {
-      return NextResponse.json({ success: true, alreadyDeleted: true });
+      return NextResponse.json({ error: "Node not found" }, { status: 404 });
     }
 
     await requireProjectEdit(existingNode.projectId, user.id);
 
-    // Delete node, update counts, and log atomically so the client never sees a
-    // failed deletion response after the row was already removed.
+    // Delete node and decrement organization nodeCount in a transaction
     await prisma.$transaction(async (tx) => {
       await tx.node.delete({
         where: { id: nodeId },
@@ -281,26 +293,28 @@ export async function DELETE(
         where: { id: existingNode.orgId },
         data: { nodeCount: { decrement: 1 } },
       });
+    });
 
-      await createActivityLog({
-        orgId: existingNode.orgId,
-        projectId: existingNode.projectId,
-        userId: user.id,
-        action: "DELETE_NODE",
-        entityType: "NODE",
-        entityId: nodeId,
-        details: {
-          title: existingNode.title,
-        },
-      }, tx);
+    // Log activity
+    await createActivityLog({
+      projectId: existingNode.projectId,
+      userId: user.id,
+      action: "DELETE_NODE",
+      entityType: "NODE",
+      entityId: nodeId,
+      details: {
+        title: existingNode.title,
+      },
     });
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    const authResponse = authOrPermissionErrorResponse(error);
-    if (authResponse) return authResponse;
-
     console.error("DELETE /api/nodes/[nodeId] error:", error);
+
+    if (error instanceof Error && error.message === "Not a member of this project") {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
     return NextResponse.json({ error: "Failed to delete node" }, { status: 500 });
   }
 }

@@ -85,16 +85,16 @@ interface Organization {
     role: string;
 }
 
-interface MemberUpdateInput {
+type MemberUpdateInput = {
     role?: Member["role"];
-    status?: Member["status"];
+    status?: Member["status"] | "";
     teamIds?: string[];
-}
+};
 
-interface TeamCreateInput {
+type TeamCreateInput = {
     name: string;
-    description?: string;
-}
+    description: string;
+};
 
 export default function WorkspaceSettingsPage() {
     const params = useParams();
@@ -115,7 +115,7 @@ export default function WorkspaceSettingsPage() {
     // Member Edit State
     const [selectedTeams, setSelectedTeams] = useState<string[]>([]);
     const [selectedRole, setSelectedRole] = useState<"ADMIN" | "MEMBER">("MEMBER");
-    const [selectedStatus, setSelectedStatus] = useState<Member["status"]>("ACTIVE");
+    const [selectedStatus, setSelectedStatus] = useState<Member["status"] | "">("");
 
     // Team Creation State
     const [newTeamName, setNewTeamName] = useState("");
@@ -355,7 +355,7 @@ export default function WorkspaceSettingsPage() {
     const activeMembers = members?.filter(m => m.status !== "PENDING_APPROVAL") || [];
 
     return (
-        <div className="mx-auto max-w-4xl">
+        <div className="max-w-4xl mx-auto py-10 px-6">
             <div className="mb-8 flex flex-col gap-2">
                 <Link
                     href={`/org/${orgId}/projects`}
@@ -364,7 +364,7 @@ export default function WorkspaceSettingsPage() {
                     <ArrowLeft className="h-4 w-4" />
                     Back to workspace
                 </Link>
-                <h1 className="flex items-center gap-3 text-2xl font-bold tracking-tight text-[#1a1b1e] sm:text-3xl">
+                <h1 className="text-3xl font-bold text-[#1a1b1e] tracking-tight flex items-center gap-3">
                     <SettingsIcon className="h-7 w-7 text-[#7b7c7e]" />
                     Workspace Settings
                 </h1>
@@ -372,15 +372,13 @@ export default function WorkspaceSettingsPage() {
             </div>
 
             <Tabs defaultValue={initialTab} className="space-y-6">
-                <div className="-mx-1 overflow-x-auto px-1 pb-1">
-                <TabsList className="inline-flex h-auto min-w-max rounded-lg bg-[#f1f1ef] p-1">
+                <TabsList className="bg-[#f1f1ef] p-1 rounded-lg w-fit">
                     <TabsTrigger value="general" className="rounded-md px-4 py-1.5 text-sm font-medium">General</TabsTrigger>
                     <TabsTrigger value="members" className="rounded-md px-4 py-1.5 text-sm font-medium flex items-center gap-2">
                         Members {pendingApprovals.length > 0 && <span className="h-2 w-2 bg-[#eb5757] rounded-full" />}
                     </TabsTrigger>
                     <TabsTrigger value="teams" className="rounded-md px-4 py-1.5 text-sm font-medium">Teams</TabsTrigger>
                 </TabsList>
-                </div>
 
                 {/* --- General Settings --- */}
                 <TabsContent value="general" className="space-y-6 animate-in fade-in duration-300">
@@ -392,19 +390,19 @@ export default function WorkspaceSettingsPage() {
                         <CardContent className="space-y-6">
                             <div className="space-y-2">
                                 <Label htmlFor="wsName" className="font-semibold text-sm">Workspace Name</Label>
-                                <div className="flex flex-col gap-3 sm:flex-row">
+                                <div className="flex gap-3">
                                     <Input
                                         id="wsName"
                                         value={workspaceName}
                                         onChange={(e) => setWorkspaceName(e.target.value)}
-                                        className="h-10 max-w-md"
+                                        className="max-w-md h-10"
                                         disabled={!isAdmin}
                                     />
                                     {isAdmin && (
                                         <Button
                                             onClick={handleSaveWorkspace}
                                             disabled={updateOrgMutation.isPending || workspaceName === orgData?.name}
-                                            className="w-full bg-[#1a1b1e] text-white hover:bg-[#37352f] sm:w-auto"
+                                            className="bg-[#1a1b1e] text-white hover:bg-[#37352f]"
                                         >
                                             {updateOrgMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save"}
                                         </Button>
@@ -421,7 +419,7 @@ export default function WorkspaceSettingsPage() {
                             <CardDescription>Share this link with people you want to join this workspace.</CardDescription>
                         </CardHeader>
                         <CardContent>
-                            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                            <div className="flex items-center gap-3">
                                 <div className="flex-1 px-3 h-10 bg-[#f7f7f5] border border-[#e9e9e9] rounded-lg text-sm flex items-center text-[#7b7c7e] truncate select-all">
                                     {orgData?.inviteCode
                                         ? `${typeof window !== 'undefined' ? window.location.origin : ''}/invite/${orgData.inviteCode}`
@@ -430,7 +428,7 @@ export default function WorkspaceSettingsPage() {
                                 <Button
                                     variant="outline"
                                     onClick={copyInviteLink}
-                                    className="h-10 w-full border-[#e9e9e9] sm:w-auto"
+                                    className="h-10 border-[#e9e9e9]"
                                     disabled={!orgData?.inviteCode}
                                 >
                                     {copied ? <Check className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4" />}
@@ -453,8 +451,8 @@ export default function WorkspaceSettingsPage() {
                                 </CardDescription>
                             </CardHeader>
                             <CardContent>
-                                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                                    <div className="min-w-0">
+                                <div className="flex items-center justify-between">
+                                    <div>
                                         <div className="font-medium text-sm">Delete this workspace</div>
                                         <p className="text-xs text-[#7b7c7e] mt-1">
                                             Once you delete a workspace, there is no going back. All projects, nodes, and data will be permanently removed.
@@ -463,7 +461,7 @@ export default function WorkspaceSettingsPage() {
                                     <Button
                                         variant="destructive"
                                         onClick={() => setDeleteDialogOpen(true)}
-                                        className="w-full bg-red-600 hover:bg-red-700 sm:w-auto"
+                                        className="bg-red-600 hover:bg-red-700"
                                     >
                                         <Trash2 className="h-4 w-4 mr-2" />
                                         Delete Workspace
@@ -487,44 +485,6 @@ export default function WorkspaceSettingsPage() {
                                 </CardTitle>
                             </CardHeader>
                             <CardContent>
-                                <div className="space-y-3 md:hidden">
-                                    {pendingApprovals.map((member) => (
-                                        <div key={member.id} className="rounded-lg border border-[#f1f1ef] bg-white p-3">
-                                            <div className="flex items-start gap-3">
-                                                <Avatar className="h-9 w-9 border border-[#e9e9e9]">
-                                                    <AvatarImage src={member.image || undefined} />
-                                                    <AvatarFallback className="bg-[#f1f1ef] text-xs font-bold text-[#7b7c7e]">
-                                                        {member.name?.[0] || member.email[0].toUpperCase()}
-                                                    </AvatarFallback>
-                                                </Avatar>
-                                                <div className="min-w-0 flex-1">
-                                                    <div className="truncate text-sm font-semibold">{member.name || "User"}</div>
-                                                    <div className="truncate text-[12px] text-[#7b7c7e]">{member.email}</div>
-                                                </div>
-                                            </div>
-                                            <div className="mt-3 grid grid-cols-2 gap-2">
-                                                <Button
-                                                    size="sm"
-                                                    className="h-8 bg-[#1a1b1e] text-white hover:bg-[#37352f]"
-                                                    onClick={() => handleApprove(member.userId)}
-                                                    disabled={updateMemberMutation.isPending}
-                                                >
-                                                    Approve
-                                                </Button>
-                                                <Button
-                                                    size="sm"
-                                                    variant="ghost"
-                                                    className="h-8 text-[#eb5757] hover:bg-red-50"
-                                                    onClick={() => handleReject(member.userId)}
-                                                    disabled={updateMemberMutation.isPending}
-                                                >
-                                                    Decline
-                                                </Button>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                                <div className="hidden md:block">
                                 <Table>
                                     <TableBody>
                                         {pendingApprovals.map((member) => (
@@ -568,7 +528,6 @@ export default function WorkspaceSettingsPage() {
                                         ))}
                                     </TableBody>
                                 </Table>
-                                </div>
                             </CardContent>
                         </Card>
                     )}
@@ -584,48 +543,6 @@ export default function WorkspaceSettingsPage() {
                             </Badge>
                         </CardHeader>
                         <CardContent>
-                            <div className="space-y-3 md:hidden">
-                                {activeMembers.map((member) => (
-                                    <div key={member.id} className="rounded-lg border border-[#f1f1ef] bg-white p-3">
-                                        <div className="flex items-start gap-3">
-                                            <Avatar className="h-9 w-9 border border-[#e9e9e9]">
-                                                <AvatarImage src={member.image || undefined} />
-                                                <AvatarFallback className="bg-[#f1f1ef] text-xs font-bold text-[#7b7c7e]">
-                                                    {member.name?.[0] || member.email?.[0]?.toUpperCase() || "?"}
-                                                </AvatarFallback>
-                                            </Avatar>
-                                            <div className="min-w-0 flex-1">
-                                                <div className="truncate text-sm font-medium text-[#1a1b1e]">{member.name || "User"}</div>
-                                                <div className="truncate text-[11px] text-[#7b7c7e]">{member.email}</div>
-                                                <div className="mt-2 flex flex-wrap gap-1">
-                                                    <Badge variant="secondary" className={cn(
-                                                        "h-5 text-[10px] font-bold uppercase tracking-wider",
-                                                        member.role === "ADMIN" ? "bg-[#37352f] text-white" : "bg-[#f1f1ef] text-[#7b7c7e]"
-                                                    )}>
-                                                        {member.role}
-                                                    </Badge>
-                                                    {member.teams.map(t => (
-                                                        <Badge key={t.id} variant="outline" className="h-5 bg-white text-[10px] border-[#f1f1ef]">
-                                                            {t.name}
-                                                        </Badge>
-                                                    ))}
-                                                </div>
-                                            </div>
-                                            {isAdmin && (
-                                                <Button
-                                                    variant="ghost"
-                                                    size="sm"
-                                                    className="h-8 w-8 shrink-0 p-0"
-                                                    onClick={() => handleEditMember(member)}
-                                                >
-                                                    <Settings2 className="h-4 w-4 text-[#7b7c7e]" />
-                                                </Button>
-                                            )}
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                            <div className="hidden md:block">
                             <Table>
                                 <TableHeader>
                                     <TableRow className="hover:bg-transparent border-b border-[#f1f1ef]">
@@ -672,7 +589,7 @@ export default function WorkspaceSettingsPage() {
                                             </TableCell>
                                             <TableCell className="text-right">
                                                 {isAdmin && (
-                                                    <div className="flex items-center justify-end gap-1 opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100">
+                                                    <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                                         <Button
                                                             variant="ghost"
                                                             size="sm"
@@ -688,14 +605,13 @@ export default function WorkspaceSettingsPage() {
                                     ))}
                                 </TableBody>
                             </Table>
-                            </div>
                         </CardContent>
                     </Card>
                 </TabsContent>
 
                 {/* --- Teams Management --- */}
                 <TabsContent value="teams" className="space-y-6 animate-in fade-in duration-300">
-                    <div className="mb-2 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex items-center justify-between mb-2">
                         <div className="space-y-1">
                             <h3 className="text-lg font-bold">Workspace Teams</h3>
                             <p className="text-sm text-[#7b7c7e]">Group members into teams for project access and messaging.</p>
@@ -703,7 +619,7 @@ export default function WorkspaceSettingsPage() {
                         {isAdmin && (
                             <Button
                                 onClick={() => setCreateTeamOpen(true)}
-                                className="w-full bg-[#1a1b1e] text-white hover:bg-[#37352f] sm:w-auto"
+                                className="bg-[#1a1b1e] text-white hover:bg-[#37352f]"
                             >
                                 <Plus className="h-4 w-4 mr-2" />
                                 Create Team
@@ -711,7 +627,7 @@ export default function WorkspaceSettingsPage() {
                         )}
                     </div>
 
-                    <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="grid gap-4 md:grid-cols-2">
                         {teamsData?.map(team => (
                             <Card key={team.id} className="border-[#e9e9e9] shadow-sm hover:border-[#d1d1d1] transition-all group">
                                 <CardHeader className="pb-3">
@@ -750,7 +666,7 @@ export default function WorkspaceSettingsPage() {
                             </Card>
                         ))}
                         {teamsData?.length === 0 && (
-                            <div className="py-12 text-center border-2 border-dashed border-[#e9e9e9] rounded-xl sm:col-span-2">
+                            <div className="col-span-2 py-12 text-center border-2 border-dashed border-[#e9e9e9] rounded-xl">
                                 <Users className="h-10 w-10 text-[#d1d2d5] mx-auto mb-4 opacity-30" />
                                 <p className="text-[#7b7c7e] text-sm">No teams created yet. Start by creating your first team.</p>
                             </div>

@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { requireAuth, isOrgMember } from "@/lib/utils/auth";
 import { z } from "zod";
-import { Prisma } from "@prisma/client";
 
 const ReorderProjectsSchema = z.object({
     orgId: z.string(),
@@ -12,6 +11,18 @@ const ReorderProjectsSchema = z.object({
         folderId: z.string().nullable().optional(),
     })),
 });
+
+function getErrorMessage(error: unknown) {
+    return error instanceof Error ? error.message : "Unknown error";
+}
+
+function getPrismaErrorMetadata(error: unknown) {
+    if (typeof error !== "object" || error === null) {
+        return {};
+    }
+
+    return error as { code?: string; meta?: unknown };
+}
 
 // PUT /api/projects/reorder - Bulk update project order and subject assignment
 export async function PUT(request: NextRequest) {
@@ -43,11 +54,9 @@ export async function PUT(request: NextRequest) {
         return NextResponse.json({ success: true });
     } catch (error) {
         console.error("PUT /api/projects/reorder error:", error);
-        if (error instanceof Prisma.PrismaClientKnownRequestError) {
-            console.error("Error code:", error.code);
-            console.error("Error meta:", error.meta);
-        }
-        const details = error instanceof Error ? error.message : "Unknown error";
-        return NextResponse.json({ error: "Failed to reorder projects", details }, { status: 500 });
+        const metadata = getPrismaErrorMetadata(error);
+        if (metadata.code) console.error("Error code:", metadata.code);
+        if (metadata.meta) console.error("Error meta:", metadata.meta);
+        return NextResponse.json({ error: "Failed to reorder projects", details: getErrorMessage(error) }, { status: 500 });
     }
 }

@@ -5,6 +5,8 @@ import { getUserTeams } from "@/lib/utils/permissions";
 import { buildTeamRequestFilters, requestDetailsInclude, toRequestDTO } from "@/lib/utils/requests";
 import { Prisma } from "@prisma/client";
 
+type RequestWithDetails = Prisma.RequestGetPayload<{ include: typeof requestDetailsInclude }>;
+
 // GET /api/requests/inbox - Get requests in inbox (mine or team)
 export async function GET(request: NextRequest) {
   try {
@@ -18,7 +20,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "projectId is required" }, { status: 400 });
     }
 
-    let requests: Prisma.RequestGetPayload<{ include: typeof requestDetailsInclude }>[] = [];
+    let requests: RequestWithDetails[] = [];
 
     if (mode === "mine") {
       // Get requests assigned to me personally

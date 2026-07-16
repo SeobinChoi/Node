@@ -8,7 +8,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { ExternalLink, Clock, Inbox as InboxIcon, MoreHorizontal, Bell, UserPlus, CheckCircle2, Shield, CheckCheck } from "lucide-react";
+import { ExternalLink, Clock, Inbox as InboxIcon, MoreHorizontal, Bell, UserPlus, CheckCircle2, Shield } from "lucide-react";
 import { RequestDTO, NotificationDTO, ProjectInviteDTO, OrgMemberDTO, InboxItem } from "@/types";
 import { toast } from "sonner";
 import {
@@ -22,28 +22,22 @@ import {
 function NotificationCard({
   notification,
   onAction,
-  orgId,
 }: {
   notification: NotificationDTO;
   onAction: () => void;
-  orgId: string;
 }) {
   const [isLoading, setIsLoading] = useState(false);
 
   const handleRead = async () => {
-    if (notification.isRead) return;
-
     setIsLoading(true);
     try {
-      const res = await fetch("/api/notifications/read", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ orgId, notificationIds: [notification.id] }),
+      const res = await fetch(`/api/notifications/${notification.id}/read`, {
+        method: "PATCH",
       });
       if (!res.ok) throw new Error("Failed to mark as read");
       onAction();
     } catch {
-      toast.error("Failed to mark notification as read");
+      toast.error("Failed to dismiss notification");
     } finally {
       setIsLoading(false);
     }
@@ -83,24 +77,21 @@ function NotificationCard({
   const borderCol = notification.targetType === "TEAM" ? "border-l-purple-500" : "border-l-blue-500";
 
   return (
-    <Card className={`overflow-hidden border-l-4 ${notification.isRead ? "border-l-muted bg-muted/10" : borderCol} shadow-sm`}>
-      <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
-        <div className="flex min-w-0 gap-3">
+    <Card className={`overflow-hidden border-l-4 ${borderCol} shadow-sm`}>
+      <div className="flex items-start justify-between p-4 gap-4">
+        <div className="flex gap-3">
           <div className={`mt-1 ${getBadgeColor()} p-2 rounded-full`}>
             {getIcon()}
           </div>
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <h3 className="min-w-0 text-sm font-semibold">{notification.title}</h3>
+          <div>
+            <div className="flex items-center gap-2">
+              <h3 className="text-sm font-semibold">{notification.title}</h3>
               {notification.targetType === "TEAM" && (
                 <Badge variant="outline" className="text-[10px] h-4 px-1 uppercase tracking-wider text-purple-600 border-purple-200">Team</Badge>
               )}
-              {notification.isRead && (
-                <Badge variant="secondary" className="text-[10px] h-4 px-1 uppercase tracking-wider">Read</Badge>
-              )}
             </div>
-            <p className="break-words text-sm text-muted-foreground">{notification.message}</p>
-            <div className="mt-2 flex flex-wrap items-center gap-2">
+            <p className="text-sm text-muted-foreground">{notification.message}</p>
+            <div className="flex items-center gap-2 mt-2">
               <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">
                 {notification.type.replace("_", " ")}
               </span>
@@ -109,9 +100,9 @@ function NotificationCard({
             </div>
           </div>
         </div>
-        <div className="flex gap-2 sm:shrink-0">
-          <Button className="w-full sm:w-auto" size="sm" variant={notification.isRead ? "secondary" : "default"} onClick={handleRead} disabled={isLoading || notification.isRead}>
-            {notification.isRead ? "Read" : "Mark as Read"}
+        <div className="flex gap-2">
+          <Button size="sm" variant="default" onClick={handleRead} disabled={isLoading}>
+            Check as Read
           </Button>
         </div>
       </div>
@@ -148,29 +139,29 @@ function InviteCard({
 
   return (
     <Card className="overflow-hidden border-l-4 border-l-purple-500 shadow-sm">
-      <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
-        <div className="flex min-w-0 gap-3">
+      <div className="flex items-start justify-between p-4 gap-4">
+        <div className="flex gap-3">
           <div className="mt-1 bg-purple-100 dark:bg-purple-900/30 p-2 rounded-full">
             <UserPlus className="h-4 w-4 text-purple-600 dark:text-purple-400" />
           </div>
-          <div className="min-w-0">
+          <div>
             <h3 className="text-sm font-semibold">Project Invitation</h3>
-            <p className="break-words text-sm text-muted-foreground">
+            <p className="text-sm text-muted-foreground">
               <span className="font-medium text-foreground">{invite.invitedByUserName}</span> invited you to join{" "}
               <span className="font-medium text-foreground">{invite.projectName}</span>
             </p>
-            <div className="mt-2 flex flex-wrap items-center gap-2">
+            <div className="flex items-center gap-2 mt-2">
               <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Invite</span>
               <span className="text-muted-foreground">•</span>
               <span className="text-[10px] text-muted-foreground">{new Date(invite.createdAt).toLocaleDateString()}</span>
             </div>
           </div>
         </div>
-        <div className="flex gap-2 sm:shrink-0">
-          <Button size="sm" className="flex-1 bg-purple-600 text-white hover:bg-purple-700 sm:flex-none" onClick={() => handleResponse(true)} disabled={isLoading}>
+        <div className="flex gap-2">
+          <Button size="sm" className="bg-purple-600 hover:bg-purple-700 text-white" onClick={() => handleResponse(true)} disabled={isLoading}>
             Accept
           </Button>
-          <Button size="sm" variant="ghost" className="flex-1 sm:flex-none" onClick={() => handleResponse(false)} disabled={isLoading}>
+          <Button size="sm" variant="ghost" onClick={() => handleResponse(false)} disabled={isLoading}>
             Decline
           </Button>
         </div>
@@ -211,28 +202,28 @@ function JoinRequestCard({
 
   return (
     <Card className="overflow-hidden border-l-4 border-l-amber-500 shadow-sm">
-      <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
-        <div className="flex min-w-0 gap-3">
+      <div className="flex items-start justify-between p-4 gap-4">
+        <div className="flex gap-3">
           <div className="mt-1 bg-amber-100 dark:bg-amber-900/30 p-2 rounded-full">
             <Shield className="h-4 w-4 text-amber-600 dark:text-amber-400" />
           </div>
-          <div className="min-w-0">
+          <div>
             <h3 className="text-sm font-semibold">Join Request</h3>
-            <p className="break-words text-sm text-muted-foreground">
+            <p className="text-sm text-muted-foreground">
               <span className="font-medium text-foreground">{member.userName || member.userEmail}</span> wants to join the workspace.
             </p>
-            <div className="mt-2 flex flex-wrap items-center gap-2">
+            <div className="flex items-center gap-2 mt-2">
               <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Admin Approval</span>
               <span className="text-muted-foreground">•</span>
               <span className="text-[10px] text-muted-foreground">{new Date(member.createdAt).toLocaleDateString()}</span>
             </div>
           </div>
         </div>
-        <div className="flex gap-2 sm:shrink-0">
-          <Button size="sm" className="flex-1 bg-amber-600 text-white hover:bg-amber-700 sm:flex-none" onClick={() => handleAction(true)} disabled={isLoading}>
+        <div className="flex gap-2">
+          <Button size="sm" className="bg-amber-600 hover:bg-amber-700 text-white" onClick={() => handleAction(true)} disabled={isLoading}>
             Approve
           </Button>
-          <Button size="sm" variant="ghost" className="flex-1 sm:flex-none" onClick={() => handleAction(false)} disabled={isLoading}>
+          <Button size="sm" variant="ghost" onClick={() => handleAction(false)} disabled={isLoading}>
             Decline
           </Button>
         </div>
@@ -346,13 +337,13 @@ function RequestCard({
   return (
     <Card className="overflow-hidden">
       {/* Header row - Project, Node, Status */}
-      <div className="flex flex-col gap-2 border-b bg-muted/50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:py-2">
-        <div className="flex min-w-0 flex-wrap items-center gap-2 text-sm sm:gap-3">
+      <div className="flex items-center justify-between px-4 py-2 bg-muted/50 border-b">
+        <div className="flex items-center gap-3 text-sm">
           <button
             onClick={handleNavigateToNode}
-            className="flex min-w-0 items-center gap-1.5 font-medium text-primary hover:underline"
+            className="flex items-center gap-1.5 font-medium text-primary hover:underline"
           >
-            <span className="truncate">{request.linkedNodeTitle}</span>
+            {request.linkedNodeTitle}
             <ExternalLink className="h-3 w-3" />
           </button>
           <span className="text-muted-foreground">•</span>
@@ -365,7 +356,7 @@ function RequestCard({
             {new Date(request.createdAt).toLocaleDateString()}
           </span>
         </div>
-        <div className="flex items-center justify-between gap-2 sm:justify-end">
+        <div className="flex items-center gap-2">
           <Badge variant={request.status === "APPROVED" ? "default" : "secondary"}>
             {request.status}
           </Badge>
@@ -406,7 +397,7 @@ function RequestCard({
               rows={2}
               className="resize-none text-sm"
             />
-            <div className="flex flex-col gap-2 pt-1 sm:flex-row">
+            <div className="flex gap-2 pt-1">
               {request.toTeam && !request.toUserId && (
                 <Button size="sm" variant="outline" onClick={handleClaim} disabled={isLoading}>
                   Claim
@@ -442,7 +433,6 @@ export default function OrgInboxPage() {
   const params = useParams();
   const orgId = params.orgId as string;
   const [activeTab, setActiveTab] = useState("me");
-  const [isMarkingAllRead, setIsMarkingAllRead] = useState(false);
 
   const { data, isLoading, refetch } = useQuery({
     queryKey: ["org-inbox-unified", orgId, activeTab],
@@ -482,31 +472,6 @@ export default function OrgInboxPage() {
 
     return true;
   }) || [];
-  const visibleUnreadNotificationIds = filteredItems.flatMap((item) =>
-    item.type === "NOTIFICATION" && !item.data.isRead ? [item.data.id] : []
-  );
-
-  const handleMarkAllRead = async () => {
-    if (visibleUnreadNotificationIds.length === 0) return;
-
-    setIsMarkingAllRead(true);
-    try {
-      const res = await fetch("/api/notifications/read", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ orgId, notificationIds: visibleUnreadNotificationIds }),
-      });
-
-      if (!res.ok) throw new Error("Failed to mark notifications as read");
-
-      toast.success(`${visibleUnreadNotificationIds.length} notification${visibleUnreadNotificationIds.length === 1 ? "" : "s"} marked as read`);
-      refetch();
-    } catch {
-      toast.error("Failed to mark notifications as read");
-    } finally {
-      setIsMarkingAllRead(false);
-    }
-  };
 
   // Mark inbox as seen when page loads
   useEffect(() => {
@@ -521,35 +486,21 @@ export default function OrgInboxPage() {
   }, [orgId]);
 
   return (
-    <div className="space-y-5 sm:space-y-6">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <h1 className="text-2xl font-bold sm:text-3xl">Inbox</h1>
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h1 className="text-3xl font-bold">Inbox</h1>
         <Badge variant="outline" className="text-xs text-muted-foreground">
-          {filteredItems.length} ITEMS
+          {data?.items.length || 0} ITEMS
         </Badge>
       </div>
 
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="h-auto w-full bg-muted/50 p-1 sm:w-auto">
-            <TabsTrigger value="me" className="data-[state=active]:bg-background">To Me</TabsTrigger>
-            <TabsTrigger value="team">To My Team</TabsTrigger>
-            <TabsTrigger value="archived">Archived</TabsTrigger>
-          </TabsList>
-        </Tabs>
-        {visibleUnreadNotificationIds.length > 0 && (
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={handleMarkAllRead}
-            disabled={isMarkingAllRead}
-            className="w-full gap-2 sm:w-auto"
-          >
-            <CheckCheck className="h-4 w-4" />
-            Mark All as Read
-          </Button>
-        )}
-      </div>
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList className="bg-muted/50 p-1">
+          <TabsTrigger value="me" className="data-[state=active]:bg-background">To Me</TabsTrigger>
+          <TabsTrigger value="team">To My Team</TabsTrigger>
+          <TabsTrigger value="archived">Archived</TabsTrigger>
+        </TabsList>
+      </Tabs>
 
       {isLoading ? (
         <div className="flex flex-col items-center justify-center py-20 animate-pulse">
@@ -575,7 +526,7 @@ export default function OrgInboxPage() {
               return <RequestCard key={item.data.id} request={item.data} onAction={refetch} orgId={orgId} />;
             }
             if (item.type === "NOTIFICATION") {
-              return <NotificationCard key={item.data.id} notification={item.data} onAction={refetch} orgId={orgId} />;
+              return <NotificationCard key={item.data.id} notification={item.data} onAction={refetch} />;
             }
             if (item.type === "INVITE") {
               return <InviteCard key={item.data.id} invite={item.data} onAction={refetch} />;

@@ -2,10 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { requireAuth } from "@/lib/utils/auth";
 import { requireProjectEdit, requireProjectView } from "@/lib/utils/permissions";
-import { authOrPermissionErrorResponse } from "@/lib/utils/api-error-responses";
 import { createActivityLog } from "@/lib/utils/activity-log";
 import { createNotification } from "@/lib/utils/notifications";
-import { Prisma } from "@prisma/client";
 import {
     extractMentionNames,
     getNodeForCollaboration,
@@ -18,6 +16,10 @@ import { z } from "zod";
 const UpdateNodePageSchema = z.object({
     contentMarkdown: z.string().max(200_000),
 });
+
+function isForbiddenError(error: unknown) {
+    return error instanceof Error && error.message.startsWith("Not authorized");
+}
 
 export async function GET(
     request: NextRequest,
@@ -65,12 +67,16 @@ export async function GET(
             activity: activity.map(toActivityLogEntry),
         });
     } catch (error) {
-        const authResponse = authOrPermissionErrorResponse(error);
-        if (authResponse) return authResponse;
-        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2003") {
-            return NextResponse.json({ error: "Node not found" }, { status: 404 });
+        if (error instanceof Error && error.message === "Unauthorized") {
+            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
+
+        if (isForbiddenError(error)) {
+            return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+        }
+
         console.error("GET /api/nodes/[nodeId]/page error:", error);
+
         return NextResponse.json({ error: "Failed to fetch task page" }, { status: 500 });
     }
 }
@@ -140,13 +146,16 @@ export async function PATCH(
             return NextResponse.json({ error: "Invalid input", details: error.flatten() }, { status: 400 });
         }
 
-        const authResponse = authOrPermissionErrorResponse(error);
-        if (authResponse) return authResponse;
-        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2003") {
-            return NextResponse.json({ error: "Node not found" }, { status: 404 });
+        if (error instanceof Error && error.message === "Unauthorized") {
+            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        }
+
+        if (isForbiddenError(error)) {
+            return NextResponse.json({ error: "Forbidden" }, { status: 403 });
         }
 
         console.error("PATCH /api/nodes/[nodeId]/page error:", error);
+
         return NextResponse.json({ error: "Failed to update task page" }, { status: 500 });
     }
 }

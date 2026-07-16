@@ -7,6 +7,10 @@ type SubscriptionWithPeriod = Stripe.Subscription & {
     current_period_end?: number | null;
 };
 
+type InvoiceWithSubscription = Stripe.Invoice & {
+    subscription?: string | null;
+};
+
 export async function POST(req: NextRequest) {
     if (!stripe) {
         return NextResponse.json(
@@ -109,7 +113,7 @@ export async function POST(req: NextRequest) {
             }
 
             case "customer.subscription.deleted": {
-                const subscription = event.data.object as SubscriptionWithPeriod;
+                const subscription = event.data.object as Stripe.Subscription;
                 const customerId = subscription.customer as string;
 
                 const org = await prisma.organization.findUnique({
@@ -136,11 +140,8 @@ export async function POST(req: NextRequest) {
             }
 
             case "invoice.payment_succeeded": {
-                const invoice = event.data.object as Stripe.Invoice & {
-                    subscription?: string | Stripe.Subscription | null;
-                };
-                const subscriptionId =
-                    typeof invoice.subscription === "string" ? invoice.subscription : invoice.subscription?.id;
+                const invoice = event.data.object as InvoiceWithSubscription;
+                const subscriptionId = invoice.subscription as string;
 
                 if (!subscriptionId) break;
 
@@ -169,11 +170,8 @@ export async function POST(req: NextRequest) {
             }
 
             case "invoice.payment_failed": {
-                const invoice = event.data.object as Stripe.Invoice & {
-                    subscription?: string | Stripe.Subscription | null;
-                };
-                const subscriptionId =
-                    typeof invoice.subscription === "string" ? invoice.subscription : invoice.subscription?.id;
+                const invoice = event.data.object as InvoiceWithSubscription;
+                const subscriptionId = invoice.subscription as string;
 
                 if (!subscriptionId) break;
 

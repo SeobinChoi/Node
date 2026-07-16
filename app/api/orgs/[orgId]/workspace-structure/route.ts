@@ -4,6 +4,31 @@ import { requireAuth, getUserTeams } from "@/lib/utils/auth";
 import { getActiveOrgMembership } from "@/lib/utils/permissions";
 import { Prisma } from "@prisma/client";
 
+type ProjectTreeItem = {
+    id: string;
+    name: string;
+    folderId: string | null;
+    updatedAt: Date;
+    sortOrder: number;
+    primaryTeam: { name: string } | null;
+    _count: { projectTeams: number };
+    isFavorite: boolean;
+};
+
+type FolderTreeItem = {
+    id: string;
+    orgId: string;
+    name: string;
+    description: string | null;
+    color: string;
+    parentId: string | null;
+    sortOrder: number;
+    createdAt: Date;
+    updatedAt: Date;
+    children: FolderTreeItem[];
+    projects: ProjectTreeItem[];
+};
+
 export async function GET(
     request: NextRequest,
     { params }: { params: Promise<{ orgId: string }> }
@@ -59,22 +84,6 @@ export async function GET(
             }),
         ]);
 
-        type ProjectTreeItem = {
-            id: string;
-            name: string;
-            folderId: string | null;
-            updatedAt: Date;
-            sortOrder: number;
-            primaryTeam: { name: string } | null;
-            _count: { projectTeams: number };
-            isFavorite: boolean;
-        };
-
-        type FolderTreeItem = (typeof folders)[number] & {
-            children: FolderTreeItem[];
-            projects: ProjectTreeItem[];
-        };
-
         // Build the tree
         const folderMap = new Map<string, FolderTreeItem>();
         const rootFolders: FolderTreeItem[] = [];
@@ -91,7 +100,8 @@ export async function GET(
             if (!folder) return;
 
             if (f.parentId && folderMap.has(f.parentId)) {
-                folderMap.get(f.parentId)?.children.push(folder);
+                const parentFolder = folderMap.get(f.parentId);
+                if (parentFolder) parentFolder.children.push(folder);
             } else {
                 rootFolders.push(folder);
             }
@@ -101,7 +111,7 @@ export async function GET(
         projects.forEach(p => {
             const isFavorite = p.members.length > 0 ? p.members[0].isFavorite : false;
             // Transform project to match expected DTO (flatten isFavorite)
-            const projectWithFavorite: ProjectTreeItem = {
+            const projectWithFavorite = {
                 id: p.id,
                 name: p.name,
                 folderId: p.folderId,
@@ -113,7 +123,8 @@ export async function GET(
             };
 
             if (p.folderId && folderMap.has(p.folderId)) {
-                folderMap.get(p.folderId)?.projects.push(projectWithFavorite);
+                const parentFolder = folderMap.get(p.folderId);
+                if (parentFolder) parentFolder.projects.push(projectWithFavorite);
             } else {
                 unfiledProjects.push(projectWithFavorite);
             }

@@ -26,3 +26,9 @@ Never commit `.env*` files or secrets. Use `.env.example` for required variable 
 
 ## Agent-Specific Instructions
 Project state must be stored in `.codex/project.md`, `.codex/tasks.md`, and `.codex/log.md`. At the start of each step, read all three; after changes, update active tasks and append a concise log entry.
+
+<!-- BEGIN:nextjs-agent-rules -->
+# This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` before writing any code. Heed deprecation notices.
+<!-- END:nextjs-agent-rules -->

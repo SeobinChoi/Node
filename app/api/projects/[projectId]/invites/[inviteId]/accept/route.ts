@@ -1,12 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { requireAuth } from "@/lib/utils/auth";
-import { Prisma } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
 
 interface RouteContext {
     params: Promise<{ projectId: string; inviteId: string }>;
+}
+
+function getPrismaErrorCode(error: unknown) {
+    if (typeof error !== "object" || error === null || !("code" in error)) {
+        return undefined;
+    }
+
+    return typeof error.code === "string" ? error.code : undefined;
 }
 
 // POST /api/projects/[projectId]/invites/[inviteId]/accept
@@ -86,7 +93,7 @@ export async function POST(
     } catch (error) {
         console.error("Accept Invite Error:", error);
         // Handle unique constraint violation (already member)
-        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+        if (getPrismaErrorCode(error) === 'P2002') {
             return NextResponse.json({ error: "You are already a member" }, { status: 409 });
         }
         return NextResponse.json({ error: "Failed to accept invite" }, { status: 500 });

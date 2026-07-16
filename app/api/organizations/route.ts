@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/utils/auth";
 import { prisma } from "@/lib/db/prisma";
-import { z } from "zod";
 import { Prisma } from "@prisma/client";
+import { z } from "zod";
 
 const createOrgSchema = z.object({
   name: z.string().min(1, "Organization name is required").max(100),

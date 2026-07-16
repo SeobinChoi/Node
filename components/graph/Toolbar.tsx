@@ -131,7 +131,7 @@ export function Toolbar({
   };
 
   return (
-    <div className="absolute left-2 right-2 top-2 z-10 flex max-h-[calc(100%-1rem)] flex-col gap-2 overflow-y-auto rounded-lg border border-slate-200 bg-white/90 p-2 shadow-lg backdrop-blur-md sm:left-4 sm:right-4 sm:top-4 sm:max-h-none sm:gap-3 sm:rounded-xl sm:p-3">
+    <div className="relative z-10 m-2 flex max-h-[40vh] shrink-0 flex-col gap-2 overflow-y-auto rounded-lg border border-slate-200 bg-white/90 p-2 shadow-lg backdrop-blur-md sm:m-4 sm:max-h-none sm:gap-3 sm:rounded-xl sm:p-3">
       {/* Single Row: Actions on Left, Filters on Right */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         {/* Left Side: Actions */}

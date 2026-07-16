@@ -13,7 +13,6 @@ type GraphNode = Prisma.NodeGetPayload<{
       select: {
         comments: true;
         attachments: true;
-        childNodes: true;
       };
     };
   };
@@ -51,7 +50,6 @@ export async function GET(
             select: {
               comments: true,
               attachments: true,
-              childNodes: true,
             },
           },
         },
@@ -109,8 +107,14 @@ export async function GET(
     // Create lookup maps for performance
     const ownerMap = new Map(owners.map((user) => [user.id, user.name]));
     const teamMap = new Map(teams.map((team) => [team.id, team.name]));
+    const childCountMap = new Map<string, number>();
     const nodeOwnersMap = new Map<string, Array<{ id: string; name: string }>>();
     const nodeTeamsMap = new Map<string, Array<{ id: string; name: string }>>();
+
+    baseNodes.forEach((node) => {
+      if (!node.parentNodeId) return;
+      childCountMap.set(node.parentNodeId, (childCountMap.get(node.parentNodeId) || 0) + 1);
+    });
 
     nodeOwners.forEach((nodeOwner) => {
       const { nodeId, user: owner } = nodeOwner;
@@ -190,7 +194,7 @@ export async function GET(
         updatedAt: node.updatedAt.toISOString(),
         commentCount: node._count?.comments || 0,
         attachmentCount: node._count?.attachments || 0,
-        childCount: node._count?.childNodes || 0,
+        childCount: childCountMap.get(node.id) || 0,
         positionX: node.positionX,
         positionY: node.positionY,
         phase: node.phase || null,
@@ -208,6 +212,7 @@ export async function GET(
     if (authResponse) return authResponse;
 
     console.error("GET /api/projects/[projectId]/graph error:", error);
+
     return NextResponse.json({ error: "Failed to fetch graph data" }, { status: 500 });
   }
 }
