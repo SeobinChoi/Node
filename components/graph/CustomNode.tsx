@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
+import { statusVisual, typeVisual } from "@/lib/ui/node-visuals";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -140,11 +141,12 @@ export const CustomNode = memo(({ data, selected }: CustomNodeProps) => {
   const primaryOwner = node.owners?.[0];
   const hasNoOwner = !primaryOwner;
   const isBlocked = node.computedStatus === "BLOCKED";
-  const isTodo = node.computedStatus === "TODO";
-  const isDoing = node.computedStatus === "DOING";
   const isDone = node.computedStatus === "DONE";
   const childCount = node.childCount || 0;
   const isContainer = childCount > 0;
+  const sv = statusVisual(node.computedStatus);
+  const StatusIcon = sv.icon;
+  const tv = typeVisual(node.type);
 
   useLayoutEffect(() => {
     if (isContainer) return;
@@ -179,27 +181,26 @@ export const CustomNode = memo(({ data, selected }: CustomNodeProps) => {
     <div
       ref={rootRef}
       className={cn(
-        "rounded-md border bg-white transition-all duration-200 will-change-transform",
-        isContainer ? "w-full h-full min-w-[320px] bg-slate-50/90" : "w-[264px] shadow-sm",
-        // Base state
-        isContainer ? "border-indigo-200" : "border-slate-200",
-        // Selection state
-        selected && "border-primary ring-2 ring-primary/30 z-50",
+        "overflow-hidden rounded-md border bg-white shadow-sm transition-all duration-200 will-change-transform",
+        isContainer ? "w-full h-full min-w-[320px] bg-slate-50/90 border-indigo-200" : "w-[264px] border-slate-200",
         // Hover
-        !selected && "hover:border-slate-300",
+        !selected && "hover:border-slate-300 hover:shadow-md",
+        // Selection state (brand accent)
+        selected && "border-brand ring-2 ring-brand/30 z-50",
         // Faded state (filtering)
         isFaded && "opacity-30 grayscale-[0.8] pointer-events-none",
-        // Status-based emphasis
-        isBlocked && "border-l-4 border-l-red-500 shadow-md",
-        isTodo && !selected && !isContainer && "shadow-lg border-slate-300 scale-[1.02]",
-        isDoing && !selected && "ring-2 ring-blue-400/50 shadow-lg border-blue-200",
-        isDone && "opacity-60 shadow-none border-slate-100",
-        isContainer && "shadow-sm",
-        isDropTarget && "scale-[1.06] border-indigo-500 bg-indigo-50/95 shadow-2xl shadow-indigo-300/50 ring-4 ring-indigo-300/70 animate-pulse",
-        isDragging && "cursor-grabbing scale-[1.05] rotate-1 opacity-95 shadow-2xl shadow-sky-300/40 ring-2 ring-sky-300/80",
-        isDetachTarget && "rotate-[-1deg] border-amber-400 bg-amber-50/90 shadow-2xl shadow-amber-200/70 ring-4 ring-amber-300/80"
+        // Status emphasis — only BLOCKED gets a left accent; DONE is muted
+        isBlocked && "border-l-[3px] border-l-red-500",
+        isDone && !selected && "opacity-70",
+        // Interaction states (calm, single-accent)
+        isDropTarget && "border-brand bg-brand-muted ring-2 ring-brand/40 shadow-lg",
+        isDragging && "cursor-grabbing opacity-95 ring-1 ring-brand/40 shadow-lg",
+        isDetachTarget && "border-amber-400 bg-amber-50 ring-2 ring-amber-300/60 shadow-lg"
       )}
     >
+      {/* Type-color strip (Azure Boards style) */}
+      {!isContainer && <div className={cn("h-1.5 w-full", tv.accentClass)} />}
+
       {/* Left Handle (Input) */}
       <Handle
         type="target"
@@ -240,18 +241,18 @@ export const CustomNode = memo(({ data, selected }: CustomNodeProps) => {
               </h3>
             )}
 
-            {/* Status (Subtle) */}
+            {/* Status pill — one click to cycle */}
             <Badge
-              variant="secondary"
+              variant="outline"
+              title="Click to change status"
               className={cn(
-                "text-[9px] px-1.5 py-0 uppercase tracking-wide font-medium cursor-pointer select-none",
-                node.computedStatus === "DONE" && "bg-slate-100 text-slate-500 line-through",
-                node.computedStatus === "DOING" && "bg-blue-50 text-blue-600",
-                node.computedStatus === "WAITING" && "bg-yellow-50 text-yellow-600",
-                node.computedStatus === "BLOCKED" && "bg-red-50 text-red-600"
+                "shrink-0 gap-1 px-1.5 py-0 text-[9px] font-medium uppercase tracking-wide cursor-pointer select-none transition-colors",
+                sv.badgeClass,
+                node.computedStatus === "DONE" && "line-through"
               )}
               onClick={handleStatusClick}
             >
+              <StatusIcon className="h-2.5 w-2.5" />
               {node.computedStatus}
             </Badge>
           </div>
@@ -289,7 +290,7 @@ export const CustomNode = memo(({ data, selected }: CustomNodeProps) => {
               // Assigned Owner
               <div className="flex items-center gap-2">
                 <Avatar className="h-5 w-5 border border-slate-100">
-                  <AvatarFallback className="text-[9px] bg-indigo-50 text-indigo-700">
+                  <AvatarFallback className="text-[9px] bg-blue-50 text-blue-700">
                     {getInitials(primaryOwner.name)}
                   </AvatarFallback>
                 </Avatar>
@@ -358,7 +359,7 @@ export const CustomNode = memo(({ data, selected }: CustomNodeProps) => {
                     e.stopPropagation();
                     updateNode({ manualStatus: 'DOING' });
                   }}
-                  className="nodrag shrink-0 px-3 py-1 text-[10px] font-semibold rounded bg-blue-500 text-white hover:bg-blue-600 transition-colors flex items-center gap-1 whitespace-nowrap"
+                  className="nodrag shrink-0 px-3 py-1 text-[10px] font-semibold rounded bg-brand text-brand-foreground hover:bg-brand/90 transition-colors flex items-center gap-1 whitespace-nowrap"
                 >
                   <PlayCircle className="w-3 h-3" />
                   Start
@@ -370,7 +371,7 @@ export const CustomNode = memo(({ data, selected }: CustomNodeProps) => {
                     e.stopPropagation();
                     updateNode({ manualStatus: 'DONE' });
                   }}
-                  className="nodrag shrink-0 px-3 py-1 text-[10px] font-semibold rounded bg-green-500 text-white hover:bg-green-600 transition-colors flex items-center gap-1 whitespace-nowrap"
+                  className="nodrag shrink-0 px-3 py-1 text-[10px] font-semibold rounded bg-emerald-500 text-white hover:bg-emerald-600 transition-colors flex items-center gap-1 whitespace-nowrap"
                 >
                   <CheckCircle2 className="w-3 h-3" />
                   Done
