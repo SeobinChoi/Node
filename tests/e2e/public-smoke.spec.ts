@@ -28,14 +28,14 @@ test("military AI project routes redirect unauthenticated users to login", async
 test("public military AI demo generates output and saves a node", async ({ page }) => {
   await page.goto("/military-ai-demo");
 
-  await expect(page.getByRole("heading", { name: "Node Military AI Demo" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "문서지원 통합" })).toBeVisible();
   await page.getByRole("button", { name: "Generate" }).click();
   await expect(page.getByText("AI 산출")).toBeVisible();
   await expect(page.getByRole("heading", { name: "후속조치" })).toBeVisible();
 
   await page.getByRole("button", { name: "Save" }).click();
-  await expect(page.getByTestId("saved-node-panel")).toContainText("AI 지원반");
-  await expect(page.getByTestId("saved-node-panel")).toContainText("생성됨");
+  await expect(page.getByTestId("saved-node-panel")).toContainText("공개 데모 저장소");
+  await expect(page.getByTestId("saved-node-panel")).toContainText("DB 저장");
 });
 
 test("public service demos load and respond to sample-data actions", async ({ page }) => {
@@ -51,7 +51,7 @@ test("public service demos load and respond to sample-data actions", async ({ pa
     await page.getByRole("button", { name: demo.action }).click();
     await expect(page.getByTestId("demo-result-panel")).toBeVisible();
     await expect(page.getByTestId("saved-service-panel")).toContainText(
-      "실제 DB 쓰기 없이",
+      "저장된 시연 항목",
     );
   }
 });
