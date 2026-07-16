@@ -3,10 +3,12 @@ export interface GraphPosition {
   y: number;
 }
 
-export const GRAPH_NODE_WIDTH = 240;
-export const GRAPH_NODE_HEIGHT = 120;
-export const GRAPH_GRID_COLUMN_WIDTH = 320;
-export const GRAPH_GRID_ROW_HEIGHT = 180;
+export const GRAPH_NODE_WIDTH = 264;
+export const GRAPH_NODE_HEIGHT = 132;
+// Board cell = one node "slot". Kept slightly larger than the card so each
+// node sits inside its own board rectangle (Azure DevOps Boards style).
+export const GRAPH_GRID_COLUMN_WIDTH = 300;
+export const GRAPH_GRID_ROW_HEIGHT = 170;
 export const GRAPH_CHILD_GRID_MIN_X = 32;
 export const GRAPH_CHILD_GRID_MIN_Y = 76;
 

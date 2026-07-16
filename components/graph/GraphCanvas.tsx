@@ -1486,14 +1486,14 @@ export function GraphCanvas({ projectId, orgId, data, onDataChange, focusNodeId 
             clearSelection();
           }}
           >
-            {/* 미세 점 배경 (질감) */}
-            <Background id="grid-dots" variant={BackgroundVariant.Dots} gap={15} size={1} color="#eef2f7" />
-            {/* 체스판 격자: snap 셀(320x180)과 동일한 칸 경계를 표시 */}
+            {/* 보드 배경: 각 노드가 들어가는 board 셀 사각형 (Azure DevOps Boards 스타일) */}
             <Background
-              id="grid-cells"
+              id="board-cells"
               variant={BackgroundVariant.Lines}
               gap={[GRAPH_GRID_COLUMN_WIDTH, GRAPH_GRID_ROW_HEIGHT]}
-              color="#dbe2ea"
+              lineWidth={1.5}
+              color="#cbd5e1"
+              style={{ backgroundColor: "#f8fafc" }}
             />
             <Controls />
             <MiniMap className="hidden sm:block" nodeStrokeColor="#e2e8f0" nodeColor="#f8fafc" />

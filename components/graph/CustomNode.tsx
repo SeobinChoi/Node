@@ -180,7 +180,7 @@ export const CustomNode = memo(({ data, selected }: CustomNodeProps) => {
       ref={rootRef}
       className={cn(
         "rounded-md border bg-white transition-all duration-200 will-change-transform",
-        isContainer ? "w-full h-full min-w-[320px] bg-slate-50/90" : "min-w-[240px] max-w-[280px]",
+        isContainer ? "w-full h-full min-w-[320px] bg-slate-50/90" : "w-[264px] shadow-sm",
         // Base state
         isContainer ? "border-indigo-200" : "border-slate-200",
         // Selection state
