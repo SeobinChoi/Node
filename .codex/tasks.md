@@ -108,3 +108,5 @@
 - [x] Reduce verification risk for the graph frame-grid patch.
 - [x] Decide whether the public sample-data demo routes should be committed/pushed as part of the current dirty military-report worktree or isolated before the next GitHub sync. (Resolved: committed together into `7496e1e` to clean the working tree.)
 - [x] Clean the dirty working tree by committing the verified demo/graph-grid/API-cleanup update set.
+- [x] Add a project "목록/요약 뷰" (그래프|목록 toggle): read-only table grouped by parent node with 업무명/담당자/기한/상태/비고, progress rollup (완료/진행/막힘/지연 + 완료율), overdue-red, reusing existing graph API. For AI중심대학 사업단 행정 파일럿. Verified tsc/eslint/build.
+- [ ] Decide grid-tidy UX for graph: existing Toolbar "Organize"→GRID (dependency-aware `calculateGridLayout`) already snaps nodes to a grid; decide whether to Korean-label it "정렬" and/or make GRID one-click for the demo.
