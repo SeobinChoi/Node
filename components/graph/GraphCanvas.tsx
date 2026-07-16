@@ -4,6 +4,7 @@ import ReactFlow, {
   Node,
   Edge,
   Background,
+  BackgroundVariant,
   Controls,
   MiniMap,
   useNodesState,
@@ -1485,7 +1486,15 @@ export function GraphCanvas({ projectId, orgId, data, onDataChange, focusNodeId 
             clearSelection();
           }}
           >
-            <Background color="#f1f5f9" gap={15} />
+            {/* 미세 점 배경 (질감) */}
+            <Background id="grid-dots" variant={BackgroundVariant.Dots} gap={15} size={1} color="#eef2f7" />
+            {/* 체스판 격자: snap 셀(320x180)과 동일한 칸 경계를 표시 */}
+            <Background
+              id="grid-cells"
+              variant={BackgroundVariant.Lines}
+              gap={[GRAPH_GRID_COLUMN_WIDTH, GRAPH_GRID_ROW_HEIGHT]}
+              color="#dbe2ea"
+            />
             <Controls />
             <MiniMap className="hidden sm:block" nodeStrokeColor="#e2e8f0" nodeColor="#f8fafc" />
           </ReactFlow>
