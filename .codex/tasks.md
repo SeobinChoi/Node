@@ -106,4 +106,5 @@
 - [x] Analyze why graph nodes move after creating a node.
 - [x] Patch graph nodes to use frame-grid snapping and adjacent-cell auto-connection.
 - [x] Reduce verification risk for the graph frame-grid patch.
-- [ ] Decide whether the public sample-data demo routes should be committed/pushed as part of the current dirty military-report worktree or isolated before the next GitHub sync.
+- [x] Decide whether the public sample-data demo routes should be committed/pushed as part of the current dirty military-report worktree or isolated before the next GitHub sync. (Resolved: committed together into `7496e1e` to clean the working tree.)
+- [x] Clean the dirty working tree by committing the verified demo/graph-grid/API-cleanup update set.
