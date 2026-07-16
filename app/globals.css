@@ -33,6 +33,9 @@
   --color-secondary: var(--secondary);
   --color-primary-foreground: var(--primary-foreground);
   --color-primary: var(--primary);
+  --color-brand: var(--brand);
+  --color-brand-foreground: var(--brand-foreground);
+  --color-brand-muted: var(--brand-muted);
   --color-popover-foreground: var(--popover-foreground);
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
@@ -56,6 +59,10 @@
   --popover-foreground: oklch(0.145 0 0);
   --primary: oklch(0.205 0 0);
   --primary-foreground: oklch(0.985 0 0);
+  /* Brand accent (Azure-style blue ≈ blue-600) for primary actions & accents */
+  --brand: oklch(0.546 0.215 262.88);
+  --brand-foreground: oklch(0.985 0 0);
+  --brand-muted: oklch(0.968 0.02 262.88);
   --secondary: oklch(0.97 0 0);
   --secondary-foreground: oklch(0.205 0 0);
   --muted: oklch(0.97 0 0);
@@ -90,6 +97,9 @@
   --popover-foreground: oklch(0.985 0 0);
   --primary: oklch(0.922 0 0);
   --primary-foreground: oklch(0.205 0 0);
+  --brand: oklch(0.62 0.19 262.88);
+  --brand-foreground: oklch(0.985 0 0);
+  --brand-muted: oklch(0.3 0.06 262.88);
   --secondary: oklch(0.269 0 0);
   --secondary-foreground: oklch(0.985 0 0);
   --muted: oklch(0.269 0 0);

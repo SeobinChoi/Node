@@ -4,6 +4,7 @@
 import { useState, useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ActivityLogEntry, NodeAttachmentDTO, NodeCommentDTO, NodeDTO, NodePageDTO, ManualStatus } from "@/types";
+import { STATUS_VISUALS } from "@/lib/ui/node-visuals";
 import {
     Sheet,
     SheetContent,
@@ -466,12 +467,7 @@ export function NodeDetailSheet({
                         <div className="p-4 rounded-lg bg-slate-50 border border-slate-100 space-y-2">
                             <div className="flex items-center justify-between">
                                 <h4 className="text-xs font-bold text-slate-500 uppercase">System Status</h4>
-                                <Badge variant="outline" className={cn(
-                                    "text-xs",
-                                    node.computedStatus === "BLOCKED" && "bg-red-50 text-red-600 border-red-200",
-                                    node.computedStatus === "WAITING" && "bg-yellow-50 text-yellow-600 border-yellow-200",
-                                    node.computedStatus === "DOING" && "bg-blue-50 text-blue-600 border-blue-200"
-                                )}>
+                                <Badge variant="outline" className={cn("text-xs gap-1", STATUS_VISUALS[node.computedStatus].badgeClass)}>
                                     {node.computedStatus}
                                 </Badge>
                             </div>

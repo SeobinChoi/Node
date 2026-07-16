@@ -1,45 +1,13 @@
 "use client";
 
-import { useMemo, type ReactNode } from "react";
-import { CheckCircle2, PlayCircle, Clock, AlertTriangle, PauseCircle } from "lucide-react";
-import { NodeDTO, ComputedStatus } from "@/types";
+import { useMemo } from "react";
+import { NodeDTO } from "@/types";
+import { STATUS_VISUALS } from "@/lib/ui/node-visuals";
 
 interface ProjectListViewProps {
   nodes: NodeDTO[];
   onSelectNode?: (nodeId: string) => void;
 }
-
-// 상태 표시 메타 (한국 행정 데모용 라벨)
-const STATUS_META: Record<
-  ComputedStatus,
-  { label: string; className: string; icon: ReactNode }
-> = {
-  DONE: {
-    label: "완료",
-    className: "bg-emerald-50 text-emerald-700 border-emerald-200",
-    icon: <CheckCircle2 className="w-3.5 h-3.5" />,
-  },
-  DOING: {
-    label: "진행",
-    className: "bg-blue-50 text-blue-700 border-blue-200",
-    icon: <PlayCircle className="w-3.5 h-3.5" />,
-  },
-  BLOCKED: {
-    label: "막힘",
-    className: "bg-red-50 text-red-700 border-red-200",
-    icon: <AlertTriangle className="w-3.5 h-3.5" />,
-  },
-  WAITING: {
-    label: "대기",
-    className: "bg-amber-50 text-amber-700 border-amber-200",
-    icon: <PauseCircle className="w-3.5 h-3.5" />,
-  },
-  TODO: {
-    label: "예정",
-    className: "bg-slate-50 text-slate-600 border-slate-200",
-    icon: <Clock className="w-3.5 h-3.5" />,
-  },
-};
 
 function startOfToday(): number {
   const now = new Date();
@@ -198,7 +166,8 @@ export function ProjectListView({ nodes, onSelectNode }: ProjectListViewProps) {
                   <tbody>
                     {section.rows.map((node) => {
                       const overdueDays = getOverdueDays(node, todayMs);
-                      const status = STATUS_META[node.computedStatus];
+                      const status = STATUS_VISUALS[node.computedStatus];
+                      const StatusIcon = status.icon;
                       const ownerNames =
                         node.owners && node.owners.length > 0
                           ? node.owners.map((o) => o.name).join(", ")
@@ -220,9 +189,9 @@ export function ProjectListView({ nodes, onSelectNode }: ProjectListViewProps) {
                           </td>
                           <td className="px-3 py-2.5">
                             <span
-                              className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium ${status.className}`}
+                              className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium ${status.badgeClass}`}
                             >
-                              {status.icon}
+                              <StatusIcon className="w-3.5 h-3.5" />
                               {status.label}
                             </span>
                           </td>
