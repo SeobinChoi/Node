@@ -111,3 +111,9 @@
 - [x] Add a project "목록/요약 뷰" (그래프|목록 toggle): read-only table grouped by parent node with 업무명/담당자/기한/상태/비고, progress rollup (완료/진행/막힘/지연 + 완료율), overdue-red, reusing existing graph API. For AI중심대학 사업단 행정 파일럿. Verified tsc/eslint/build.
 - [ ] Decide grid-tidy UX for graph: existing Toolbar "Organize"→GRID (dependency-aware `calculateGridLayout`) already snaps nodes to a grid; decide whether to Korean-label it "정렬" and/or make GRID one-click for the demo.
 - [x] Make the graph grid visible: draw snap-cell-sized "체스판" grid lines behind nodes (OrganizeDialog already defaults to GRID; GraphCanvas already snaps to [320,180]). Verified tsc/build.
+- [x] UI polish Phase 0: brand tokens (globals.css) + shared lib/ui/node-visuals.tsx; refactor ProjectListView/NodeDetailSheet.
+- [x] UI polish Phase 1: board card (CustomNode) — type-color strip, status pill, crisp states.
+- [ ] UI polish Phase 2: graph Toolbar — prominent brand Add Node, quieter secondary, cleaner panel.
+- [ ] UI polish Phase 3: ProjectListView — type icons in rows, tighter tiles/table.
+- [ ] UI polish Phase 4: app surfaces (ProjectCard, headers, Sidebar) adopt brand tokens + crisp spacing.
+- [ ] Save/keep .codex/context.md handoff current as work proceeds.
