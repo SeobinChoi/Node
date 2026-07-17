@@ -21,8 +21,9 @@ npm run dev:webpack     # THE dev server command (env + --webpack + 127.0.0.1:30
 npm run test:unit       # vitest (briefing deriver etc.)
 E2E_ENV_FILE=.env.local RUN_DB_E2E=1 npx playwright test   # full e2e (forged-cookie auth, local DB)
 npm run verify          # lint (zero-warning) + smoke + build
-npm run db:push:local   # prisma db push against .env.local
+dotenv -e .env.local -- prisma migrate dev   # schema changes go through MIGRATIONS now
 ```
+⚠️ **Schema changes use `prisma migrate dev` (local) / `migrate deploy` (runs in `npm run build`) since 2026-07-18.** Do not use `db push` against any shared/prod DB — it bypasses migration history. Baseline: `prisma/migrations/*_init`.
 - After a fresh `npm install`, run `npx prisma generate` — no postinstall hook; server 500s with `Cannot find module '.prisma/client/default'` until you do.
 - Historical note: "Turbopack hangs" in old notes was a misdiagnosis of the iCloud issue above. Both Turbopack and webpack work; `dev:webpack` remains the convenient default.
 
