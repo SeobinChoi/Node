@@ -40,9 +40,9 @@ export function FolderSection({ folder, projects, orgId, onExpandToggle, isDropZ
                                 <div className="relative group">
                                     <div
                                         {...provided.dragHandleProps}
-                                        className="absolute top-2 right-2 z-10 p-1 opacity-0 group-hover:opacity-100 cursor-grab active:cursor-grabbing hover:bg-zinc-800 rounded"
+                                        className="absolute top-2 right-2 z-10 p-1 opacity-0 group-hover:opacity-100 cursor-grab active:cursor-grabbing hover:bg-accent rounded"
                                     >
-                                        <GripVertical className="h-4 w-4 text-zinc-400" />
+                                        <GripVertical className="h-4 w-4 text-muted-foreground" />
                                     </div>
                                     <ProjectCard project={project} orgId={orgId} />
                                 </div>
@@ -110,7 +110,7 @@ export function FolderSection({ folder, projects, orgId, onExpandToggle, isDropZ
                                 {...provided.droppableProps}
                                 className={cn(
                                     "rounded-lg transition-colors p-1",
-                                    snapshot.isDraggingOver ? "bg-zinc-900/50 ring-2 ring-primary/20" : ""
+                                    snapshot.isDraggingOver ? "bg-accent ring-2 ring-brand/30" : ""
                                 )}
                             >
                                 {ProjectList}

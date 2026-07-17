@@ -131,7 +131,7 @@ export function Toolbar({
   };
 
   return (
-    <div className="relative z-10 m-2 flex max-h-[40vh] shrink-0 flex-col gap-2 overflow-y-auto rounded-lg border border-slate-200 bg-white/90 p-2 shadow-lg backdrop-blur-md sm:m-4 sm:max-h-none sm:gap-3 sm:rounded-xl sm:p-3">
+    <div className="relative z-10 m-2 flex max-h-[40vh] shrink-0 flex-col gap-2 overflow-y-auto rounded-lg border border-border bg-background/95 p-2 shadow-lg backdrop-blur-md sm:m-4 sm:max-h-none sm:gap-3 sm:rounded-xl sm:p-3">
       {/* Single Row: Actions on Left, Filters on Right */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         {/* Left Side: Actions */}
@@ -140,7 +140,7 @@ export function Toolbar({
             <Button
               size="sm"
               onClick={() => setAddNodeOpen(true)}
-              className="h-8 bg-blue-600 hover:bg-blue-700 text-white shadow-sm"
+              className="h-8 bg-brand hover:bg-brand/90 text-brand-foreground shadow-sm"
             >
               <Plus className="h-4 w-4 mr-1.5" />
               Add Node
@@ -149,14 +149,14 @@ export function Toolbar({
               size="sm"
               variant="outline"
               onClick={() => setAddEdgeOpen(true)}
-              className="h-8 border-slate-200"
+              className="h-8 border-border"
             >
               <Layout className="h-4 w-4 mr-1.5" />
               Connect
             </Button>
           </div>
 
-          <div className="hidden h-6 w-px bg-slate-200 sm:block" />
+          <div className="hidden h-6 w-px bg-border sm:block" />
 
           {/* AI Features */}
           <div className="flex flex-wrap items-center gap-2">
@@ -173,22 +173,22 @@ export function Toolbar({
               size="sm"
               variant="outline"
               onClick={() => setAutoOrganizeOpen(true)}
-              className="h-8 border-slate-200 text-slate-600 hover:text-slate-800"
+              className="h-8 border-border text-muted-foreground hover:text-foreground"
             >
               <Layers className="h-3.5 w-3.5 mr-1.5" />
               Organize
             </Button>
           </div>
 
-          <div className="hidden h-6 w-px bg-slate-200 sm:block" />
+          <div className="hidden h-6 w-px bg-border sm:block" />
 
           <div className="group relative min-w-[180px] flex-1 sm:flex-none">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground group-focus-within:text-brand transition-colors" />
             <Input
               placeholder="Search nodes..."
               value={searchQuery}
               onChange={(e) => onSearchChange(e.target.value)}
-              className="h-8 w-full bg-slate-50 pl-9 text-sm transition-all border-transparent focus:bg-white focus:border-blue-200 sm:w-[260px]"
+              className="h-8 w-full bg-muted pl-9 text-sm transition-all border-transparent focus:bg-background focus:border-brand/30 sm:w-[260px]"
             />
           </div>
         </div>
@@ -208,9 +208,9 @@ export function Toolbar({
                 }
               }}
             >
-              <SelectTrigger className="h-8 min-w-[140px] flex-1 bg-slate-50 border-transparent transition-all hover:bg-slate-100 sm:w-[140px] sm:flex-none">
+              <SelectTrigger className="h-8 min-w-[140px] flex-1 bg-muted border-transparent transition-all hover:bg-accent sm:w-[140px] sm:flex-none">
                 <div className="flex items-center gap-2">
-                  <Users2 className="h-3.5 w-3.5 text-slate-500" />
+                  <Users2 className="h-3.5 w-3.5 text-muted-foreground" />
                   <SelectValue placeholder="All People">
                     {selectedUserIds.length === 0 ? "All People" : selectedUserIds.length === 1 ? members.find((m: { id: string; name: string }) => m.id === selectedUserIds[0])?.name : `${selectedUserIds.length} people`}
                   </SelectValue>
@@ -228,9 +228,9 @@ export function Toolbar({
 
             {/* Status Filter */}
             <Select value={filterStatus} onValueChange={onFilterChange}>
-              <SelectTrigger className="h-8 min-w-[130px] flex-1 bg-slate-50 border-transparent transition-all hover:bg-slate-100 sm:w-[130px] sm:flex-none">
+              <SelectTrigger className="h-8 min-w-[130px] flex-1 bg-muted border-transparent transition-all hover:bg-accent sm:w-[130px] sm:flex-none">
                 <div className="flex items-center gap-2">
-                  <Filter className="h-3.5 w-3.5 text-slate-500" />
+                  <Filter className="h-3.5 w-3.5 text-muted-foreground" />
                   <SelectValue placeholder="Status" />
                 </div>
               </SelectTrigger>
@@ -243,7 +243,7 @@ export function Toolbar({
                 </SelectItem>
                 <SelectItem value="TODO">
                   <div className="flex items-center gap-2">
-                    <Clock className="h-3.5 w-3.5 text-slate-400" /> Todo
+                    <Clock className="h-3.5 w-3.5 text-muted-foreground" /> Todo
                   </div>
                 </SelectItem>
                 <SelectItem value="DOING">
@@ -264,7 +264,7 @@ export function Toolbar({
                 variant="ghost"
                 size="sm"
                 onClick={clearAllFilters}
-                className="h-8 flex-1 text-slate-500 hover:text-red-500 hover:bg-red-50 sm:flex-none"
+                className="h-8 flex-1 text-muted-foreground hover:text-destructive hover:bg-destructive/10 sm:flex-none"
               >
                 <X className="h-3.5 w-3.5 mr-1" />
                 Clear
@@ -283,7 +283,7 @@ export function Toolbar({
                     "cursor-pointer text-xs h-6 transition-all",
                     selectedTeamIds.includes(team.id)
                       ? "bg-purple-600 hover:bg-purple-700 text-white"
-                      : "border-slate-200 hover:border-purple-400 hover:bg-purple-50 text-slate-600"
+                      : "border-border hover:border-purple-400 hover:bg-purple-50 text-muted-foreground"
                   )}
                   onClick={() => toggleTeamFilter(team.id)}
                 >

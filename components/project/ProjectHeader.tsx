@@ -131,17 +131,17 @@ export function ProjectHeader({
                         {displayCollaborators.slice(0, 3).map((collaborator) => (
                             <Avatar
                                 key={collaborator.id}
-                                className="h-7 w-7 border-2 border-white hover:z-10 transition-all cursor-pointer"
+                                className="h-7 w-7 border-2 border-background hover:z-10 transition-all cursor-pointer"
                                 title={collaborator.name}
                             >
                                 <AvatarImage src={collaborator.image} />
-                                <AvatarFallback className="text-[10px] bg-gradient-to-br from-blue-500 to-purple-500 text-white">
+                                <AvatarFallback className="text-[10px] bg-brand text-brand-foreground">
                                     {getInitials(collaborator.name)}
                                 </AvatarFallback>
                             </Avatar>
                         ))}
                         {displayCollaborators.length > 3 && (
-                            <div className="h-7 w-7 rounded-full border-2 border-white bg-muted flex items-center justify-center text-[10px] font-medium text-muted-foreground">
+                            <div className="h-7 w-7 rounded-full border-2 border-background bg-muted flex items-center justify-center text-[10px] font-medium text-muted-foreground">
                                 +{displayCollaborators.length - 3}
                             </div>
                         )}
@@ -206,7 +206,7 @@ export function ProjectHeader({
                                 <span>Project settings</span>
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
-                            <DropdownMenuItem className="text-red-600">
+                            <DropdownMenuItem className="text-destructive">
                                 <span>Delete project</span>
                             </DropdownMenuItem>
                         </DropdownMenuContent>

@@ -3,8 +3,6 @@ import { useQueryClient } from "@tanstack/react-query";
 import ReactFlow, {
   Node,
   Edge,
-  Background,
-  BackgroundVariant,
   Controls,
   MiniMap,
   useNodesState,
@@ -20,6 +18,8 @@ import dagre from "dagre";
 import "reactflow/dist/style.css";
 import { EdgeDTO, EdgeRelation, GraphData, NodeDTO } from "@/types";
 import { CustomNode } from "./CustomNode";
+import { BoardCellsBackground } from "./BoardCellsBackground";
+import { GRAPH_COLORS } from "@/lib/ui/graph-colors";
 import { ActionCenterBar } from "./ActionCenterBar";
 import { Toolbar } from "./Toolbar";
 import { CanvasContextMenu, ContextMenuPosition } from "./CanvasContextMenu";
@@ -90,7 +90,7 @@ const hierarchyDropOverlapRatio = 0.24;
 const hierarchyDetachOverlapRatio = 0.45;
 const graphEdgeStyle = {
   strokeWidth: 2,
-  stroke: "#94a3b8",
+  stroke: GRAPH_COLORS.edgeStroke,
 };
 const graphEdgePathOptions = {
   curvature: 0.45,
@@ -205,7 +205,7 @@ function toFlowEdge(edge: EdgeDTO): Edge {
     pathOptions: graphEdgePathOptions,
     markerEnd: {
       type: MarkerType.ArrowClosed,
-      color: "#64748b",
+      color: GRAPH_COLORS.edgeArrow,
     },
     style: graphEdgeStyle,
     data: { originalEdge: edge },
@@ -1486,17 +1486,21 @@ export function GraphCanvas({ projectId, orgId, data, onDataChange, focusNodeId 
             clearSelection();
           }}
           >
-            {/* 보드 배경: 각 노드가 들어가는 board 셀 사각형 (Azure DevOps Boards 스타일) */}
-            <Background
-              id="board-cells"
-              variant={BackgroundVariant.Lines}
-              gap={[GRAPH_GRID_COLUMN_WIDTH, GRAPH_GRID_ROW_HEIGHT]}
+            {/* 보드 배경: 각 노드가 들어가는 board 셀 사각형 (Azure DevOps Boards 스타일).
+                카드가 셀 가운데 오도록 경계를 조정해야 해서 패턴을 직접 그린다. */}
+            <BoardCellsBackground
               lineWidth={1.5}
-              color="#cbd5e1"
-              style={{ backgroundColor: "#f8fafc" }}
+              color={GRAPH_COLORS.gridLine}
+              backgroundColor={GRAPH_COLORS.canvasBg}
             />
             <Controls />
-            <MiniMap className="hidden sm:block" nodeStrokeColor="#e2e8f0" nodeColor="#f8fafc" />
+            {/* xl 미만에서는 마지막 보드 칸을 가려서 숨긴다 */}
+            <MiniMap
+              pannable
+              className="hidden xl:block !bg-background/80 rounded-md border border-border"
+              nodeStrokeColor={GRAPH_COLORS.minimapNodeStroke}
+              nodeColor={GRAPH_COLORS.minimapNodeFill}
+            />
           </ReactFlow>
 
           {/* Empty State */}

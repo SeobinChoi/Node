@@ -147,6 +147,7 @@ export const CustomNode = memo(({ data, selected }: CustomNodeProps) => {
   const sv = statusVisual(node.computedStatus);
   const StatusIcon = sv.icon;
   const tv = typeVisual(node.type);
+  const TypeIcon = tv.icon;
 
   useLayoutEffect(() => {
     if (isContainer) return;
@@ -190,7 +191,7 @@ export const CustomNode = memo(({ data, selected }: CustomNodeProps) => {
         // Faded state (filtering)
         isFaded && "opacity-30 grayscale-[0.8] pointer-events-none",
         // Status emphasis — only BLOCKED gets a left accent; DONE is muted
-        isBlocked && "border-l-[3px] border-l-red-500",
+        isBlocked && "border-l-2 border-l-red-400",
         isDone && !selected && "opacity-70",
         // Interaction states (calm, single-accent)
         isDropTarget && "border-brand bg-brand-muted ring-2 ring-brand/40 shadow-lg",
@@ -198,8 +199,6 @@ export const CustomNode = memo(({ data, selected }: CustomNodeProps) => {
         isDetachTarget && "border-amber-400 bg-amber-50 ring-2 ring-amber-300/60 shadow-lg"
       )}
     >
-      {/* Type-color strip (Azure Boards style) */}
-      {!isContainer && <div className={cn("h-1.5 w-full", tv.accentClass)} />}
 
       {/* Left Handle (Input) */}
       <Handle
@@ -221,8 +220,39 @@ export const CustomNode = memo(({ data, selected }: CustomNodeProps) => {
             </div>
           )}
 
-          {/* 1. Header: Title & Status */}
-          <div className="flex items-start justify-between gap-2 mb-2">
+          {/* 1. Header: 코너 태그(종류) + 상태 pill. 제목은 아래 줄에서 전체 폭을 쓴다. */}
+          <div className="flex items-center justify-between gap-2 mb-1.5">
+            {!isContainer && (
+              <span
+                title={tv.label}
+                className={cn(
+                  "inline-flex shrink-0 items-center gap-1 rounded border px-1.5 py-0 text-[9px] font-medium uppercase tracking-wide",
+                  tv.tagClass
+                )}
+              >
+                <TypeIcon className="h-2.5 w-2.5" />
+                {tv.label}
+              </span>
+            )}
+
+            {/* Status pill — one click to cycle */}
+            <Badge
+              variant="outline"
+              title="Click to change status"
+              className={cn(
+                "ml-auto shrink-0 gap-1 px-1.5 py-0 text-[9px] font-medium uppercase tracking-wide cursor-pointer select-none transition-colors",
+                sv.badgeClass,
+                node.computedStatus === "DONE" && "line-through"
+              )}
+              onClick={handleStatusClick}
+            >
+              <StatusIcon className="h-2.5 w-2.5" />
+              {node.computedStatus}
+            </Badge>
+          </div>
+
+          {/* 2. Title */}
+          <div className="mb-2">
             {isEditingTitle ? (
               <Input
                 value={editedTitle}
@@ -240,21 +270,6 @@ export const CustomNode = memo(({ data, selected }: CustomNodeProps) => {
                 {node.title}
               </h3>
             )}
-
-            {/* Status pill — one click to cycle */}
-            <Badge
-              variant="outline"
-              title="Click to change status"
-              className={cn(
-                "shrink-0 gap-1 px-1.5 py-0 text-[9px] font-medium uppercase tracking-wide cursor-pointer select-none transition-colors",
-                sv.badgeClass,
-                node.computedStatus === "DONE" && "line-through"
-              )}
-              onClick={handleStatusClick}
-            >
-              <StatusIcon className="h-2.5 w-2.5" />
-              {node.computedStatus}
-            </Badge>
           </div>
 
           {/* 2. Owner (Clean, Neutral) */}

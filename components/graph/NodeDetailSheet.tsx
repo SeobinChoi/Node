@@ -331,7 +331,7 @@ export function NodeDetailSheet({
                         </div>
 
                         {/* Status Toggles */}
-                        <div className="grid w-full grid-cols-3 rounded-lg bg-slate-100 p-1 sm:flex sm:w-fit">
+                        <div className="grid w-full grid-cols-3 rounded-lg bg-muted p-1 sm:flex sm:w-fit">
                             {(["TODO", "DOING", "DONE"] as ManualStatus[]).map((status) => (
                                 <button
                                     key={status}
@@ -339,8 +339,8 @@ export function NodeDetailSheet({
                                     className={cn(
                                         "justify-center rounded-md px-2 py-1.5 text-xs font-medium transition-all flex items-center gap-1.5 sm:px-4 sm:gap-2",
                                         currentStatus === status
-                                            ? "bg-white text-slate-900 shadow-sm"
-                                            : "text-slate-500 hover:text-slate-700 hover:bg-slate-200/50"
+                                            ? "bg-background text-foreground shadow-sm"
+                                            : "text-muted-foreground hover:text-foreground hover:bg-accent"
                                     )}
                                 >
                                     {status === "TODO" && <Clock className="w-3.5 h-3.5" />}
@@ -374,7 +374,7 @@ export function NodeDetailSheet({
 
                         <TabsContent value="details" className="pt-6 space-y-8">
                             <div className="space-y-3">
-                                <h4 className="text-sm font-medium text-slate-500 uppercase tracking-wider">Summary</h4>
+                                <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Summary</h4>
                                 <Textarea
                                     value={description}
                                     onChange={(e) => setDescription(e.target.value)}
@@ -386,7 +386,7 @@ export function NodeDetailSheet({
                             <div className="grid grid-cols-1 gap-6">
                             {/* Node Owner */}
                             <div className="space-y-3">
-                                <h4 className="text-sm font-medium text-slate-500 uppercase tracking-wider">Node Owner</h4>
+                                <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Node Owner</h4>
                                 <div className="relative">
                                     <select
                                         value={node.owners && node.owners.length > 0 ? node.owners[0].id : ""}
@@ -399,7 +399,7 @@ export function NodeDetailSheet({
                                                 updateNode({ ownerIds: [selectedId, ...otherIds] });
                                             }
                                         }}
-                                        className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                                        className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
                                     >
                                         <option value="">Select owner...</option>
                                         {members.map((member) => (
@@ -409,14 +409,14 @@ export function NodeDetailSheet({
                                         ))}
                                     </select>
                                     {node.owners && node.owners.length > 0 && (
-                                        <div className="mt-2 flex items-center gap-3 p-3 rounded-lg bg-slate-50 border border-slate-200">
+                                        <div className="mt-2 flex items-center gap-3 p-3 rounded-lg bg-muted/50 border border-border">
                                             <Avatar className="h-8 w-8">
                                                 <AvatarFallback className="text-xs">
                                                     {getInitials(node.owners[0].name)}
                                                 </AvatarFallback>
                                             </Avatar>
                                             <div>
-                                                <p className="text-sm font-medium text-slate-900">{node.owners[0].name}</p>
+                                                <p className="text-sm font-medium text-foreground">{node.owners[0].name}</p>
                                             </div>
                                         </div>
                                     )}
@@ -425,7 +425,7 @@ export function NodeDetailSheet({
 
                             {/* Engaging Team */}
                             <div className="space-y-3">
-                                <h4 className="text-sm font-medium text-slate-500 uppercase tracking-wider">Engaging Team</h4>
+                                <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Engaging Team</h4>
                                 <MultiSelectSearch
                                     items={members}
                                     selectedIds={node.owners?.map((owner) => owner.id) || []}
@@ -445,10 +445,10 @@ export function NodeDetailSheet({
                             </div>
 
                             <div className="space-y-3">
-                                <h4 className="text-sm font-medium text-slate-500 uppercase tracking-wider">Due Date</h4>
+                                <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Due Date</h4>
                                 <div className="relative">
                                     <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
-                                        <Calendar className="h-4 w-4 text-slate-500" />
+                                        <Calendar className="h-4 w-4 text-muted-foreground" />
                                     </div>
                                     <Input
                                         type="date"
@@ -464,14 +464,14 @@ export function NodeDetailSheet({
                         </div>
 
                         {/* Computed Status (ReadOnly) */}
-                        <div className="p-4 rounded-lg bg-slate-50 border border-slate-100 space-y-2">
+                        <div className="p-4 rounded-lg bg-muted/50 border border-border space-y-2">
                             <div className="flex items-center justify-between">
-                                <h4 className="text-xs font-bold text-slate-500 uppercase">System Status</h4>
+                                <h4 className="text-xs font-bold text-muted-foreground uppercase">System Status</h4>
                                 <Badge variant="outline" className={cn("text-xs gap-1", STATUS_VISUALS[node.computedStatus].badgeClass)}>
                                     {node.computedStatus}
                                 </Badge>
                             </div>
-                            <p className="text-xs text-slate-500">
+                            <p className="text-xs text-muted-foreground">
                                 {node.computedStatus === "BLOCKED" && "This task cannot proceed because it depends on incomplete upstream tasks."}
                                 {node.computedStatus === "WAITING" && "This task is waiting for external dependencies or approvals."}
                                 {node.computedStatus === "DOING" && "All dependencies are met. This task is ready to be worked on."}
@@ -517,7 +517,7 @@ export function NodeDetailSheet({
                                                 </div>
                                             </div>
                                         </div>
-                                        <p className="whitespace-pre-wrap text-sm text-slate-700">{comment.body}</p>
+                                        <p className="whitespace-pre-wrap text-sm text-foreground/90">{comment.body}</p>
                                     </div>
                                 ))}
                                 {commentsQuery.data?.comments?.length === 0 && (
@@ -618,7 +618,7 @@ export function NodeDetailSheet({
                                 Delete node
                             </Button>
                             <Button
-                                className="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 text-white"
+                                className="w-full sm:w-auto bg-brand hover:bg-brand/90 text-brand-foreground"
                                 onClick={() => setRequestDialogOpen(true)}
                             >
                                 <MessageSquarePlus className="w-4 h-4 mr-2" />

@@ -3,12 +3,13 @@
 import { useState, type ReactNode } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
-import { Network, List } from "lucide-react";
+import { Network, List, Sparkles } from "lucide-react";
 import { GraphCanvas } from "@/components/graph/GraphCanvas";
 import { ProjectListView } from "@/components/graph/ProjectListView";
+import { ProjectBriefingView } from "@/components/graph/ProjectBriefingView";
 import { GraphData } from "@/types";
 
-type ProjectView = "graph" | "list";
+type ProjectView = "briefing" | "graph" | "list";
 
 export default function GraphPage() {
   const params = useParams();
@@ -16,7 +17,8 @@ export default function GraphPage() {
   const projectId = params.projectId as string;
   const urlFocusNodeId = searchParams.get("nodeId");
 
-  const [view, setView] = useState<ProjectView>("graph");
+  // ?nodeId= 딥링크는 보드로, 그 외에는 브리핑이 기본 화면
+  const [view, setView] = useState<ProjectView>(urlFocusNodeId ? "graph" : "briefing");
   const [focusNodeId, setFocusNodeId] = useState<string | null>(urlFocusNodeId);
 
   const { data, isLoading, refetch } = useQuery({
@@ -41,12 +43,18 @@ export default function GraphPage() {
   return (
     <div className="flex flex-col h-[calc(100vh-12rem)]">
       {/* 뷰 전환 탭 */}
-      <div className="flex items-center gap-1 border-b border-slate-200 bg-white px-3 py-1.5">
+      <div className="flex items-center gap-1 border-b border-border bg-background px-3 py-1.5">
+        <ViewTab
+          active={view === "briefing"}
+          onClick={() => setView("briefing")}
+          icon={<Sparkles className="w-4 h-4" />}
+          label="브리핑"
+        />
         <ViewTab
           active={view === "graph"}
           onClick={() => setView("graph")}
           icon={<Network className="w-4 h-4" />}
-          label="그래프"
+          label="보드"
         />
         <ViewTab
           active={view === "list"}
@@ -57,7 +65,15 @@ export default function GraphPage() {
       </div>
 
       <div className="flex-1 overflow-hidden">
-        {view === "graph" ? (
+        {view === "briefing" ? (
+          <ProjectBriefingView
+            data={data}
+            onSelectNode={(nodeId) => {
+              setFocusNodeId(nodeId);
+              setView("graph");
+            }}
+          />
+        ) : view === "graph" ? (
           <GraphCanvas
             projectId={projectId}
             orgId={orgId}
@@ -95,8 +111,8 @@ function ViewTab({
       onClick={onClick}
       className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
         active
-          ? "bg-slate-900 text-white"
-          : "text-slate-500 hover:text-slate-800 hover:bg-slate-100"
+          ? "bg-brand text-brand-foreground"
+          : "text-muted-foreground hover:text-foreground hover:bg-accent"
       }`}
     >
       {icon}

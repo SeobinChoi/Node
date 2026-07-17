@@ -336,14 +336,14 @@ export function Sidebar({ currentOrgId, variant = "desktop", onNavigate }: Sideb
       className={cn(
         "flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-md transition-colors",
         active
-          ? "bg-[#2c2d31] text-white"
-          : "text-[#9ca3af] hover:bg-[#2c2d31]/50 hover:text-[#e5e7eb]"
+          ? "bg-sidebar-accent text-sidebar-accent-foreground"
+          : "text-muted-foreground hover:bg-sidebar-accent/60 hover:text-sidebar-foreground"
       )}
     >
       <Icon className="h-4 w-4" />
       <span className="flex-1 truncate">{label}</span>
       {count !== undefined && count > 0 && (
-        <span className="px-1.5 py-0.5 min-w-[1.25rem] text-center text-xs font-semibold rounded-full bg-blue-500 text-white">
+        <span className="px-1.5 py-0.5 min-w-[1.25rem] text-center text-xs font-semibold rounded-full bg-brand text-brand-foreground">
           {count > 99 ? '99+' : count}
         </span>
       )}
@@ -355,13 +355,13 @@ export function Sidebar({ currentOrgId, variant = "desktop", onNavigate }: Sideb
   return (
     <div
       className={cn(
-        "relative flex flex-col bg-[#1a1b1e]",
-        isMobile ? "h-full w-full" : "h-screen border-r border-[#2c2d31]"
+        "relative flex flex-col bg-sidebar text-sidebar-foreground",
+        isMobile ? "h-full w-full" : "h-screen border-r border-sidebar-border"
       )}
       style={isMobile ? undefined : { width: `${sidebarWidth}px` }}
     >
       {/* Workspace Header */}
-      <div className="h-14 flex items-center px-4 border-b border-[#2c2d31]">
+      <div className="h-14 flex items-center px-4 border-b border-sidebar-border">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button
@@ -369,17 +369,17 @@ export function Sidebar({ currentOrgId, variant = "desktop", onNavigate }: Sideb
               className="w-full justify-between gap-2 px-0 hover:bg-transparent"
             >
               <div className="flex items-center gap-2 overflow-hidden">
-                <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded bg-blue-600 text-[10px] font-bold text-white">
+                <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded bg-brand text-[10px] font-bold text-brand-foreground">
                   {currentWorkspace?.name.charAt(0).toUpperCase()}
                 </div>
-                <span className="truncate font-semibold text-white">
+                <span className="truncate font-semibold text-sidebar-foreground">
                   {currentWorkspace?.name || "Loading..."}
                 </span>
               </div>
-              <ChevronDown className="h-4 w-4 text-[#6b7280]" />
+              <ChevronDown className="h-4 w-4 text-muted-foreground" />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="w-[200px] bg-[#1f2023] border-[#2c2d31] text-white">
+          <DropdownMenuContent align="start" className="w-[200px]">
             {workspaces?.map((w) => (
               <DropdownMenuItem
                 key={w.orgId}
@@ -396,16 +396,16 @@ export function Sidebar({ currentOrgId, variant = "desktop", onNavigate }: Sideb
                   onNavigate?.();
                   router.push(targetPath);
                 }}
-                className="gap-2 focus:bg-[#2c2d31] focus:text-white cursor-pointer"
+                className="gap-2 cursor-pointer"
               >
-                <div className="flex h-5 w-5 items-center justify-center rounded bg-zinc-700 text-[10px]">
+                <div className="flex h-5 w-5 items-center justify-center rounded bg-muted text-[10px]">
                   {w.name.charAt(0)}
                 </div>
                 {w.name}
               </DropdownMenuItem>
             ))}
-            <DropdownMenuSeparator className="bg-[#2c2d31]" />
-            <DropdownMenuItem className="gap-2 focus:bg-[#2c2d31] focus:text-white cursor-pointer">
+            <DropdownMenuSeparator />
+            <DropdownMenuItem className="gap-2 cursor-pointer">
               <Plus className="h-4 w-4" /> Create Workspace
             </DropdownMenuItem>
           </DropdownMenuContent>
@@ -423,7 +423,7 @@ export function Sidebar({ currentOrgId, variant = "desktop", onNavigate }: Sideb
           >
             <SearchIcon className="h-4 w-4" />
             <span className="flex-1 text-left">Search...</span>
-            <kbd className="pointer-events-none inline-flex h-5 select-none items-center gap-1 rounded border border-[#4b5563] bg-[#2c2d31] px-1.5 font-mono text-[10px] font-medium text-[#9ca3af] opacity-50">
+            <kbd className="pointer-events-none inline-flex h-5 select-none items-center gap-1 rounded border border-border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground opacity-70">
               <span className="text-xs">⌘</span>K
             </kbd>
           </Button>
@@ -452,14 +452,14 @@ export function Sidebar({ currentOrgId, variant = "desktop", onNavigate }: Sideb
 
           <div className="pt-6">
             <div className="flex items-center justify-between px-3 mb-2">
-              <h3 className="text-xs font-semibold text-[#6b7280] uppercase tracking-wider">
+              <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                 Projects
               </h3>
               <div className="flex items-center gap-1">
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-4 w-4 text-[#6b7280] hover:text-[#e5e7eb] hover:bg-transparent"
+                  className="h-4 w-4 text-muted-foreground hover:text-foreground hover:bg-transparent"
                   onClick={() => {
                     onNavigate?.();
                     router.push(`/org/${currentOrgId}/projects/new`);
@@ -470,7 +470,7 @@ export function Sidebar({ currentOrgId, variant = "desktop", onNavigate }: Sideb
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-4 w-4 text-[#6b7280] hover:text-[#e5e7eb] hover:bg-transparent"
+                  className="h-4 w-4 text-muted-foreground hover:text-foreground hover:bg-transparent"
                   onClick={() => openCreateFolderModal(undefined)}
                 >
                   <FolderKanban className="h-3 w-3" />
@@ -484,18 +484,18 @@ export function Sidebar({ currentOrgId, variant = "desktop", onNavigate }: Sideb
                   <div className="space-y-2 px-2">
                     {/* Skeleton folder items */}
                     <div className="flex items-center gap-2 py-1.5 px-2">
-                      <div className="h-3 w-3 bg-[#2c2d31] rounded animate-pulse" />
-                      <div className="h-3.5 w-3.5 bg-[#2c2d31] rounded animate-pulse" />
-                      <div className="h-3 flex-1 bg-[#2c2d31] rounded animate-pulse" />
+                      <div className="h-3 w-3 bg-muted rounded animate-pulse" />
+                      <div className="h-3.5 w-3.5 bg-muted rounded animate-pulse" />
+                      <div className="h-3 flex-1 bg-muted rounded animate-pulse" />
                     </div>
                     <div className="flex items-center gap-2 py-1.5 px-2">
-                      <div className="h-3 w-3 bg-[#2c2d31] rounded animate-pulse" />
-                      <div className="h-3.5 w-3.5 bg-[#2c2d31] rounded animate-pulse" />
-                      <div className="h-3 w-24 bg-[#2c2d31] rounded animate-pulse" />
+                      <div className="h-3 w-3 bg-muted rounded animate-pulse" />
+                      <div className="h-3.5 w-3.5 bg-muted rounded animate-pulse" />
+                      <div className="h-3 w-24 bg-muted rounded animate-pulse" />
                     </div>
                     <div className="flex items-center gap-2 py-1.5 px-2 pl-6">
-                      <div className="h-4 w-4 bg-[#2c2d31] rounded animate-pulse" />
-                      <div className="h-3 w-32 bg-[#2c2d31] rounded animate-pulse" />
+                      <div className="h-4 w-4 bg-muted rounded animate-pulse" />
+                      <div className="h-3 w-32 bg-muted rounded animate-pulse" />
                     </div>
                   </div>
                 ) : (
@@ -505,7 +505,7 @@ export function Sidebar({ currentOrgId, variant = "desktop", onNavigate }: Sideb
                         <div
                           ref={provided.innerRef}
                           {...provided.droppableProps}
-                          className={cn("min-h-[4px] transition-all duration-150 relative", snapshot.isDraggingOver && "before:absolute before:top-0 before:left-0 before:right-0 before:h-0.5 before:bg-blue-500 before:rounded-full")}
+                          className={cn("min-h-[4px] transition-all duration-150 relative", snapshot.isDraggingOver && "before:absolute before:top-0 before:left-0 before:right-0 before:h-0.5 before:bg-brand before:rounded-full")}
                         >
                           {structure?.root.folders.map((folder, index) => (
                             <FolderTreeItem
@@ -527,7 +527,7 @@ export function Sidebar({ currentOrgId, variant = "desktop", onNavigate }: Sideb
                         <div
                           ref={provided.innerRef}
                           {...provided.droppableProps}
-                          className={cn("min-h-[8px] mt-2 transition-all duration-150 relative", snapshot.isDraggingOver && "before:absolute before:top-0 before:left-0 before:right-0 before:h-0.5 before:bg-blue-500 before:rounded-full")}
+                          className={cn("min-h-[8px] mt-2 transition-all duration-150 relative", snapshot.isDraggingOver && "before:absolute before:top-0 before:left-0 before:right-0 before:h-0.5 before:bg-brand before:rounded-full")}
                         >
                           {structure?.root.unfiledProjects.map((project, index) => (
                             <ProjectTreeItem
@@ -548,9 +548,9 @@ export function Sidebar({ currentOrgId, variant = "desktop", onNavigate }: Sideb
                       structure?.root.folders.length === 0 &&
                       structure?.root.unfiledProjects.length === 0 && (
                         <div className="px-3 py-6 text-center">
-                          <FolderKanban className="h-8 w-8 mx-auto text-[#3b3c40] mb-2" />
-                          <p className="text-xs text-[#6b7280]">No projects yet</p>
-                          <p className="text-[10px] text-[#4b5563] mt-1">
+                          <FolderKanban className="h-8 w-8 mx-auto text-muted-foreground/40 mb-2" />
+                          <p className="text-xs text-muted-foreground">No projects yet</p>
+                          <p className="text-[10px] text-muted-foreground/70 mt-1">
                             Click + to create one
                           </p>
                         </div>
@@ -564,34 +564,34 @@ export function Sidebar({ currentOrgId, variant = "desktop", onNavigate }: Sideb
       </ScrollArea>
 
       {/* User Footer */}
-      <div className="p-3 border-t border-[#2c2d31]">
+      <div className="p-3 border-t border-sidebar-border">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" className="w-full justify-start gap-2 px-2 hover:bg-[#2c2d31]">
+            <Button variant="ghost" className="w-full justify-start gap-2 px-2 hover:bg-sidebar-accent">
               <Avatar className="h-6 w-6">
                 <AvatarImage src={session?.user?.image || ""} />
-                <AvatarFallback className="bg-blue-600 text-[10px] text-white">
+                <AvatarFallback className="bg-brand text-[10px] text-brand-foreground">
                   {initials}
                 </AvatarFallback>
               </Avatar>
               <div className="flex-1 text-left overflow-hidden">
-                <p className="text-sm font-medium text-white truncate">
+                <p className="text-sm font-medium text-sidebar-foreground truncate">
                   {session?.user?.name}
                 </p>
               </div>
-              <Settings className="h-4 w-4 text-[#6b7280]" />
+              <Settings className="h-4 w-4 text-muted-foreground" />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-56 bg-[#1f2023] border-[#2c2d31] text-white">
+          <DropdownMenuContent align="end" className="w-56">
             <DropdownMenuItem
-              className="gap-2 focus:bg-[#2c2d31] focus:text-white cursor-pointer"
+              className="gap-2 cursor-pointer"
               onClick={() => router.push("/settings/profile")}
               onSelect={onNavigate}
             >
               <UserCircle2 className="h-4 w-4" /> Profile
             </DropdownMenuItem>
             <DropdownMenuItem
-              className="gap-2 focus:bg-[#2c2d31] focus:text-white cursor-pointer"
+              className="gap-2 cursor-pointer"
               onClick={() => {
                 onNavigate?.();
                 router.push(`/org/${currentOrgId}/settings`);
@@ -599,9 +599,9 @@ export function Sidebar({ currentOrgId, variant = "desktop", onNavigate }: Sideb
             >
               <Settings className="h-4 w-4" /> Workspace Settings
             </DropdownMenuItem>
-            <DropdownMenuSeparator className="bg-[#2c2d31]" />
+            <DropdownMenuSeparator />
             <DropdownMenuItem
-              className="gap-2 text-red-400 focus:bg-[#2c2d31] focus:text-red-400 cursor-pointer"
+              className="gap-2 text-destructive focus:text-destructive cursor-pointer"
               onClick={() => signOut()}
             >
               <LogOut className="h-4 w-4" /> Log out
@@ -627,15 +627,15 @@ export function Sidebar({ currentOrgId, variant = "desktop", onNavigate }: Sideb
       {!isMobile && (
         <div
           className={cn(
-            "absolute top-0 right-0 bottom-0 w-1 cursor-ew-resize hover:bg-blue-500/50 transition-colors group",
-            isResizing && "bg-blue-500"
+            "absolute top-0 right-0 bottom-0 w-1 cursor-ew-resize hover:bg-brand/50 transition-colors group",
+            isResizing && "bg-brand"
           )}
           onMouseDown={(e) => {
             e.preventDefault();
             setIsResizing(true);
           }}
         >
-          <div className="absolute top-1/2 right-0 -translate-y-1/2 w-1 h-12 bg-slate-600 rounded-l opacity-0 group-hover:opacity-100 transition-opacity" />
+          <div className="absolute top-1/2 right-0 -translate-y-1/2 w-1 h-12 bg-border rounded-l opacity-0 group-hover:opacity-100 transition-opacity" />
         </div>
       )}
     </div>

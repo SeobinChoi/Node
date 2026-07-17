@@ -85,8 +85,8 @@ export function FolderTreeItem({ folder, orgId, level = 0, onCreateSubFolder, on
                     {/* Folder Row */}
                     <div
                         className={cn(
-                            "flex items-center gap-2 py-1.5 px-2 hover:bg-[#2c2d31] rounded-md cursor-pointer group text-[#9ca3af] hover:text-[#e5e7eb] transition-colors",
-                            snapshot.isDragging && "bg-[#2c2d31] opacity-80"
+                            "flex items-center gap-2 py-1.5 px-2 hover:bg-sidebar-accent rounded-md cursor-pointer group text-muted-foreground hover:text-sidebar-foreground transition-colors",
+                            snapshot.isDragging && "bg-sidebar-accent opacity-80"
                         )}
                         style={{ paddingLeft: level === 0 ? '8px' : `${(level * 12) + 8}px` }}
                         onClick={(e) => {
@@ -100,7 +100,7 @@ export function FolderTreeItem({ folder, orgId, level = 0, onCreateSubFolder, on
                         <div className="flex items-center justify-center w-4 h-4">
                             <ChevronRight
                                 className={cn(
-                                    "h-3 w-3 transition-transform text-[#6b7280]",
+                                    "h-3 w-3 transition-transform text-muted-foreground",
                                     isOpen && !snapshot.isDragging && "rotate-90"
                                 )}
                             />
@@ -124,7 +124,7 @@ export function FolderTreeItem({ folder, orgId, level = 0, onCreateSubFolder, on
                                     }
                                 }}
                                 onClick={(e) => e.stopPropagation()}
-                                className="h-5 text-sm py-0 px-1 bg-[#1a1b1e] border-[#3b82f6]"
+                                className="h-5 text-sm py-0 px-1 bg-background border-brand"
                                 autoFocus
                             />
                         ) : (
@@ -133,7 +133,7 @@ export function FolderTreeItem({ folder, orgId, level = 0, onCreateSubFolder, on
 
                         {/* Project count badge */}
                         {!isEditing && folder.projects.length > 0 && (
-                            <span className="text-[10px] text-[#6b7280] bg-[#2c2d31] px-1.5 py-0.5 rounded-full">
+                            <span className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded-full">
                                 {folder.projects.length}
                             </span>
                         )}
@@ -142,7 +142,7 @@ export function FolderTreeItem({ folder, orgId, level = 0, onCreateSubFolder, on
                         {!isEditing && (
                             <div className="opacity-0 group-hover:opacity-100 flex items-center gap-0.5">
                                 <button
-                                    className="p-0.5 hover:bg-[#3b3c40] rounded text-[#6b7280] hover:text-white"
+                                    className="p-0.5 hover:bg-accent rounded text-muted-foreground hover:text-foreground"
                                     title="Add Subfolder"
                                     onClick={(e) => {
                                         e.stopPropagation();
@@ -154,7 +154,7 @@ export function FolderTreeItem({ folder, orgId, level = 0, onCreateSubFolder, on
                                 <DropdownMenu>
                                     <DropdownMenuTrigger asChild>
                                         <button
-                                            className="p-0.5 hover:bg-[#3b3c40] rounded text-[#6b7280] hover:text-white"
+                                            className="p-0.5 hover:bg-accent rounded text-muted-foreground hover:text-foreground"
                                             onClick={(e) => e.stopPropagation()}
                                         >
                                             <MoreHorizontal className="h-3 w-3" />
@@ -200,7 +200,7 @@ export function FolderTreeItem({ folder, orgId, level = 0, onCreateSubFolder, on
                                         {...droppableProvided.droppableProps}
                                         className={cn(
                                             "min-h-[4px] transition-all duration-150 ml-2 relative",
-                                            droppableSnapshot.isDraggingOver && "before:absolute before:top-0 before:left-0 before:right-0 before:h-0.5 before:bg-blue-500 before:rounded-full"
+                                            droppableSnapshot.isDraggingOver && "before:absolute before:top-0 before:left-0 before:right-0 before:h-0.5 before:bg-brand before:rounded-full"
                                         )}
                                     >
                                         {folder.children.map((child, idx) => (
@@ -307,13 +307,13 @@ export function ProjectTreeItem({
                 >
                     <div
                         className={cn(
-                            "flex flex-row items-center gap-3 py-1.5 px-2 rounded-md group text-[#9ca3af] hover:text-[#e5e7eb] hover:bg-[#2c2d31] transition-colors",
-                            isActive && "bg-[#2c2d31] text-white font-medium",
+                            "flex flex-row items-center gap-3 py-1.5 px-2 rounded-md group text-muted-foreground hover:text-sidebar-foreground hover:bg-sidebar-accent transition-colors",
+                            isActive && "bg-sidebar-accent text-sidebar-accent-foreground font-medium",
                             snapshot.isDragging && "opacity-50"
                         )}
                         style={{ paddingLeft: `${(level * 12) + 32}px` }}
                     >
-                        <FileText className="h-4 w-4 text-[#6b7280] group-hover:text-[#9ca3af] shrink-0" />
+                        <FileText className="h-4 w-4 text-muted-foreground group-hover:text-foreground shrink-0" />
 
                         {isEditing ? (
                             <Input
@@ -328,7 +328,7 @@ export function ProjectTreeItem({
                                     }
                                 }}
                                 onClick={(e) => e.stopPropagation()}
-                                className="h-5 text-sm py-0 px-1 bg-[#1a1b1e] border-[#3b82f6] flex-1"
+                                className="h-5 text-sm py-0 px-1 bg-background border-brand flex-1"
                                 autoFocus
                             />
                         ) : (
@@ -347,7 +347,7 @@ export function ProjectTreeItem({
                                 <DropdownMenu>
                                     <DropdownMenuTrigger asChild>
                                         <button
-                                            className="p-0.5 hover:bg-[#3b3c40] rounded text-[#6b7280] hover:text-white"
+                                            className="p-0.5 hover:bg-accent rounded text-muted-foreground hover:text-foreground"
                                             onClick={(e) => e.stopPropagation()}
                                         >
                                             <MoreHorizontal className="h-3 w-3" />

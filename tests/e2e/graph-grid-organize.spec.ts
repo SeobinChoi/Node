@@ -20,8 +20,11 @@ test.describe("graph snap-cell grid background", () => {
       await addAuthCookie(context, ws.user);
       await page.goto(`/org/${ws.orgId}/projects/${ws.projectId}/graph`);
 
-      // Graph loaded once the 그래프|목록 toggle renders.
+      // Graph loaded once the 브리핑|보드|목록 toggle renders.
       await expect(page.getByRole("button", { name: "목록" })).toBeVisible({ timeout: 45_000 });
+
+      // 기본 화면이 브리핑이므로 보드 탭으로 전환한다.
+      await page.getByRole("button", { name: "보드" }).click();
 
       // The layered React Flow background (dots + snap-cell grid lines) is drawn behind the canvas.
       const backgrounds = page.locator(".react-flow__background");

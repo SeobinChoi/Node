@@ -90,7 +90,7 @@ test.describe("project list/summary view (목록)", () => {
       // Row click switches back to the graph (list summary disappears)
       await page.getByText("완료 업무").click();
       await expect(page.getByText("사업 진척 현황")).toHaveCount(0, { timeout: 15_000 });
-      await expect(page.getByRole("button", { name: "그래프" })).toBeVisible();
+      await expect(page.getByRole("button", { name: "보드" })).toBeVisible();
     } finally {
       const userIds = ws ? [ws.user.id] : [];
       await cleanupWorkspace(ws?.orgId ?? null, userIds);

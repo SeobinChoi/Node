@@ -25,7 +25,7 @@ export function DashboardShell({ currentOrgId, children }: DashboardShellProps) 
   const isProjectWorkspace = /\/org\/[^/]+\/projects\/[^/]+/.test(pathname || "");
 
   return (
-    <div className="flex h-[100dvh] overflow-hidden bg-gray-50">
+    <div className="flex h-[100dvh] overflow-hidden bg-muted/50">
       <div className="hidden md:flex">
         <Sidebar currentOrgId={currentOrgId} variant="desktop" />
       </div>
@@ -51,7 +51,7 @@ export function DashboardShell({ currentOrgId, children }: DashboardShellProps) 
 
         <main
           className={cn(
-            "min-w-0 flex-1 bg-gray-50",
+            "min-w-0 flex-1 bg-muted/50",
             isProjectWorkspace ? "overflow-hidden" : "overflow-y-auto"
           )}
         >
