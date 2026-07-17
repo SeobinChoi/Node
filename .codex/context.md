@@ -22,6 +22,20 @@ Turning this into a SaaS. **First customer = 서강대 AI중심대학 사업단 
 6. **UI polish Phase 0** (`dcf7510`): brand tokens + `lib/ui/node-visuals.tsx`.
 7. **UI polish Phase 1** (`7b4fbf8`): board card — type-color strips, status pills, crisp states.
 
+## Production-readiness batch (2026-07-18) — local DONE, deploy BLOCKED on creds
+All verified locally (vitest 12/12, tsc/eslint 0, e2e 10/10, prod build green with NODE_ENV=production):
+- **Migrations baseline**: fresh `prisma/migrations/*_init`; `npm run build` now runs `prisma migrate deploy`. Never `db push` against shared DBs. ⚠️ Local builds need `NODE_ENV=production` — `.env.local` sets development which breaks Next prerender ("useState null" during export).
+- **Error monitoring**: env-gated Sentry (`SENTRY_DSN`/`NEXT_PUBLIC_SENTRY_DSN`, no-op without) + structured `onRequestError` JSON logs + Korean `app/global-error.tsx`. To activate: create a Sentry project and set both DSN env vars in Vercel.
+- **Korean sweep**: Sidebar 홈/수신함/프로젝트, 액션 센터(지금 할 일/대기 중/막고 있음/저장됨), projects page(새 프로젝트/전체/최근/즐겨찾기/미분류), login copy. e2e updated (incl. regex-form `/New Project/`→`/새 프로젝트/`).
+- **Excel**: `POST /api/projects/[id]/nodes/bulk` (한국어 헤더, owner name→member 매칭, 200건 한도) + `ImportNodesDialog`(양식 다운로드) + 목록 xlsx 내보내기 (`lib/utils/node-xlsx.ts`, SheetJS).
+- **Onboarding**: 빈 프로젝트의 브리핑에 "연차보고 준비 템플릿으로 시작" → `POST /api/projects/[id]/template` (빈 프로젝트에만, 6 nodes + 의존 엣지). Browser-verified end-to-end.
+- **Mobile 375px**: briefing solid; list-view wrap fixes.
+
+**Deploy blocked (user action needed):**
+1. No GitHub push creds & no Vercel CLI token on this machine → push `main` from user terminal (Vercel auto-deploys) or `gh auth login` / `vercel login` once.
+2. Prod Supabase creds in `.env` are stale (auth failed) and prod DB has pre-migration tables → user must either reset it (Supabase dashboard SQL: `DROP SCHEMA public CASCADE; CREATE SCHEMA public;` — user approved fresh DB) or provide the current DB password so migrations can bootstrap. Without this the build-time `migrate deploy` fails with P3005.
+3. Stale-session note: after any DB reset, old JWT cookies hit "Failed to load workspaces" — the deferred stale-session-recovery task just got more urgent.
+
 ## ⚠️ Operational gotchas (IMPORTANT)
 - **Repo path is now `/Users/xavi/Developer/Node`** (moved 2026-07-17 from `~/Desktop/real_code/web/Node`). Do NOT move it back under `~/Desktop` or `~/Documents` — see below.
 - **RESOLVED (2026-07-17): the old "Turbopack hangs" note was WRONG.** The real cause was that the repo lived on the **iCloud-synced Desktop**. macOS had evicted `node_modules` file contents to iCloud (`flags=compressed,dataless`, `blocks_allocated=0`), so the *first* read of each file cost ~1s to download. Measured: 60 cold files = **76,589 ms**; same files re-read = **100 ms**; same files on non-synced disk = **87 ms** (~880x slower). With 47,838 files in `node_modules`, one compile needed ~13h of downloading → indistinguishable from a hang. It also made `git status`, `tsc`, and `prisma db push` "hang".
