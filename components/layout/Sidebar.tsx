@@ -373,7 +373,7 @@ export function Sidebar({ currentOrgId, variant = "desktop", onNavigate }: Sideb
                   {currentWorkspace?.name.charAt(0).toUpperCase()}
                 </div>
                 <span className="truncate font-semibold text-sidebar-foreground">
-                  {currentWorkspace?.name || "Loading..."}
+                  {currentWorkspace?.name || "불러오는 중..."}
                 </span>
               </div>
               <ChevronDown className="h-4 w-4 text-muted-foreground" />
@@ -406,7 +406,7 @@ export function Sidebar({ currentOrgId, variant = "desktop", onNavigate }: Sideb
             ))}
             <DropdownMenuSeparator />
             <DropdownMenuItem className="gap-2 cursor-pointer">
-              <Plus className="h-4 w-4" /> Create Workspace
+              <Plus className="h-4 w-4" /> 워크스페이스 만들기
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -422,7 +422,7 @@ export function Sidebar({ currentOrgId, variant = "desktop", onNavigate }: Sideb
             onClick={() => setIsSearchModalOpen(true)}
           >
             <SearchIcon className="h-4 w-4" />
-            <span className="flex-1 text-left">Search...</span>
+            <span className="flex-1 text-left">검색...</span>
             <kbd className="pointer-events-none inline-flex h-5 select-none items-center gap-1 rounded border border-border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground opacity-70">
               <span className="text-xs">⌘</span>K
             </kbd>
@@ -432,20 +432,20 @@ export function Sidebar({ currentOrgId, variant = "desktop", onNavigate }: Sideb
             <NavItem
               href={`/org/${currentOrgId}/home`}
               icon={Home}
-              label="Home"
+              label="홈"
               active={pathname?.includes("/home")}
             />
             <NavItem
               href={`/org/${currentOrgId}/inbox`}
               icon={Inbox}
-              label="Inbox"
+              label="수신함"
               active={pathname?.includes("/inbox")}
               count={currentWorkspace?.unreadCount}
             />
             <NavItem
               href={`/org/${currentOrgId}/projects`}
               icon={FolderKanban}
-              label="Projects"
+              label="프로젝트"
               active={pathname?.includes("/projects")}
             />
           </div>
@@ -453,7 +453,7 @@ export function Sidebar({ currentOrgId, variant = "desktop", onNavigate }: Sideb
           <div className="pt-6">
             <div className="flex items-center justify-between px-3 mb-2">
               <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                Projects
+                프로젝트
               </h3>
               <div className="flex items-center gap-1">
                 <Button
@@ -549,9 +549,9 @@ export function Sidebar({ currentOrgId, variant = "desktop", onNavigate }: Sideb
                       structure?.root.unfiledProjects.length === 0 && (
                         <div className="px-3 py-6 text-center">
                           <FolderKanban className="h-8 w-8 mx-auto text-muted-foreground/40 mb-2" />
-                          <p className="text-xs text-muted-foreground">No projects yet</p>
+                          <p className="text-xs text-muted-foreground">프로젝트가 없습니다</p>
                           <p className="text-[10px] text-muted-foreground/70 mt-1">
-                            Click + to create one
+                            + 버튼으로 만들 수 있습니다
                           </p>
                         </div>
                       )}
@@ -588,7 +588,7 @@ export function Sidebar({ currentOrgId, variant = "desktop", onNavigate }: Sideb
               onClick={() => router.push("/settings/profile")}
               onSelect={onNavigate}
             >
-              <UserCircle2 className="h-4 w-4" /> Profile
+              <UserCircle2 className="h-4 w-4" /> 프로필
             </DropdownMenuItem>
             <DropdownMenuItem
               className="gap-2 cursor-pointer"
@@ -597,14 +597,14 @@ export function Sidebar({ currentOrgId, variant = "desktop", onNavigate }: Sideb
                 router.push(`/org/${currentOrgId}/settings`);
               }}
             >
-              <Settings className="h-4 w-4" /> Workspace Settings
+              <Settings className="h-4 w-4" /> 워크스페이스 설정
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem
               className="gap-2 text-destructive focus:text-destructive cursor-pointer"
               onClick={() => signOut()}
             >
-              <LogOut className="h-4 w-4" /> Log out
+              <LogOut className="h-4 w-4" /> 로그아웃
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

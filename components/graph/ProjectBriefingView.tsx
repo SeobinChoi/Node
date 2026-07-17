@@ -1,7 +1,14 @@
 "use client";
 
-import { useMemo } from "react";
-import { AlertTriangle, ArrowRight, CalendarClock, GitBranch } from "lucide-react";
+import { useMemo, useState } from "react";
+import {
+  AlertTriangle,
+  ArrowRight,
+  CalendarClock,
+  GitBranch,
+  LayoutTemplate,
+  Loader2,
+} from "lucide-react";
 import { GraphData } from "@/types";
 import { cn } from "@/lib/utils";
 import { STATUS_VISUALS } from "@/lib/ui/node-visuals";
@@ -14,6 +21,9 @@ import {
 interface ProjectBriefingViewProps {
   data: GraphData;
   onSelectNode: (nodeId: string) => void;
+  /** 온보딩 템플릿 적용용 (없으면 CTA 숨김) */
+  projectId?: string;
+  onDataChange?: () => void;
 }
 
 const GROUP_META: Record<ActionCategory, { title: string; accentClass: string }> = {
@@ -23,13 +33,57 @@ const GROUP_META: Record<ActionCategory, { title: string; accentClass: string }>
   DO_NOW: { title: "지금", accentClass: "text-brand" },
 };
 
-export function ProjectBriefingView({ data, onSelectNode }: ProjectBriefingViewProps) {
+export function ProjectBriefingView({
+  data,
+  onSelectNode,
+  projectId,
+  onDataChange,
+}: ProjectBriefingViewProps) {
   const model = useMemo(() => deriveBriefing(data, Date.now()), [data]);
+  const [applyingTemplate, setApplyingTemplate] = useState(false);
+  const [templateError, setTemplateError] = useState<string | null>(null);
+
+  const applyTemplate = async () => {
+    if (!projectId || applyingTemplate) return;
+    setApplyingTemplate(true);
+    setTemplateError(null);
+    try {
+      const res = await fetch(`/api/projects/${projectId}/template`, { method: "POST" });
+      const body = await res.json();
+      if (!res.ok) throw new Error(body.error || "템플릿 적용에 실패했습니다");
+      onDataChange?.();
+    } catch (e) {
+      setTemplateError(e instanceof Error ? e.message : "템플릿 적용에 실패했습니다");
+    } finally {
+      setApplyingTemplate(false);
+    }
+  };
 
   if (model.isEmpty) {
     return (
-      <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
-        아직 등록된 업무가 없습니다.
+      <div className="flex h-full flex-col items-center justify-center gap-4 px-6 text-center">
+        <p className="text-sm text-muted-foreground">아직 등록된 업무가 없습니다.</p>
+        {projectId && (
+          <>
+            <button
+              onClick={applyTemplate}
+              disabled={applyingTemplate}
+              className="inline-flex items-center gap-2 rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-brand-foreground transition-colors hover:bg-brand/90 disabled:opacity-60"
+            >
+              {applyingTemplate ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <LayoutTemplate className="h-4 w-4" />
+              )}
+              연차보고 준비 템플릿으로 시작
+            </button>
+            <p className="max-w-xs text-xs text-muted-foreground">
+              사업계획 확정부터 최종 보고서 제출까지의 기본 업무 6건과 의존 관계가 만들어집니다.
+              목록 탭에서 엑셀로 가져올 수도 있습니다.
+            </p>
+            {templateError && <p className="text-xs text-red-600">{templateError}</p>}
+          </>
+        )}
       </div>
     );
   }

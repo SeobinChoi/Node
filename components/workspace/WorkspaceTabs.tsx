@@ -24,7 +24,7 @@ export function WorkspaceTabs({ activeTab, onTabChange, counts }: WorkspaceTabsP
                     value="all"
                     className="shrink-0 data-[state=active]:bg-white data-[state=active]:shadow-sm"
                 >
-                    All
+                    전체
                     {counts && counts.all > 0 && (
                         <span className="ml-1.5 text-xs text-muted-foreground">({counts.all})</span>
                     )}
@@ -33,7 +33,7 @@ export function WorkspaceTabs({ activeTab, onTabChange, counts }: WorkspaceTabsP
                     value="recents"
                     className="shrink-0 data-[state=active]:bg-white data-[state=active]:shadow-sm"
                 >
-                    Recents
+                    최근
                     {counts && counts.recents > 0 && (
                         <span className="ml-1.5 text-xs text-muted-foreground">({counts.recents})</span>
                     )}
@@ -42,7 +42,7 @@ export function WorkspaceTabs({ activeTab, onTabChange, counts }: WorkspaceTabsP
                     value="favorites"
                     className="shrink-0 data-[state=active]:bg-white data-[state=active]:shadow-sm"
                 >
-                    Favorites
+                    즐겨찾기
                     {counts && counts.favorites > 0 && (
                         <span className="ml-1.5 text-xs text-muted-foreground">({counts.favorites})</span>
                     )}
@@ -51,7 +51,7 @@ export function WorkspaceTabs({ activeTab, onTabChange, counts }: WorkspaceTabsP
                     value="unfiled"
                     className="shrink-0 data-[state=active]:bg-white data-[state=active]:shadow-sm"
                 >
-                    Unfiled
+                    미분류
                     {counts && counts.unfiled > 0 && (
                         <span className="ml-1.5 text-xs text-muted-foreground">({counts.unfiled})</span>
                     )}

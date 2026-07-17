@@ -280,7 +280,7 @@ export const CustomNode = memo(({ data, selected }: CustomNodeProps) => {
                 <div className="w-5 h-5 rounded-full border border-slate-200 bg-slate-50 flex items-center justify-center">
                   <User className="w-3 h-3 text-slate-300" />
                 </div>
-                <span className="text-[10px] text-slate-400 font-medium">Unassigned</span>
+                <span className="text-[10px] text-muted-foreground font-medium">미지정</span>
                 {/* Tiny Add Button */}
                 <DropdownMenu onOpenChange={(open) => { if (open && !hasLoadedMetadata) fetchMetadata(); }}>
                   <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>

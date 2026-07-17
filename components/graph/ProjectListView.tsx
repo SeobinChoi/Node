@@ -1,15 +1,22 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
+import { FileSpreadsheet, Download } from "lucide-react";
 import { NodeDTO } from "@/types";
 import { STATUS_VISUALS, typeVisual } from "@/lib/ui/node-visuals";
 import { startOfToday, getOverdueDays } from "@/lib/utils/overdue";
 import { fallbackReasonKo } from "@/lib/briefing/derive-briefing";
+import { exportNodesToXlsx } from "@/lib/utils/node-xlsx";
+import { ImportNodesDialog } from "./ImportNodesDialog";
 import type { NodeType } from "@/types";
 
 interface ProjectListViewProps {
   nodes: NodeDTO[];
   onSelectNode?: (nodeId: string) => void;
+  /** 엑셀 가져오기/내보내기용 (없으면 버튼 숨김) */
+  projectId?: string;
+  projectName?: string;
+  onDataChange?: () => void;
 }
 
 function formatDate(iso: string | null): string {
@@ -26,8 +33,15 @@ interface Section {
   rows: NodeDTO[];
 }
 
-export function ProjectListView({ nodes, onSelectNode }: ProjectListViewProps) {
+export function ProjectListView({
+  nodes,
+  onSelectNode,
+  projectId,
+  projectName,
+  onDataChange,
+}: ProjectListViewProps) {
   const todayMs = startOfToday();
+  const [importOpen, setImportOpen] = useState(false);
 
   // 세부과제(상위 노드)별로 묶기
   const sections = useMemo<Section[]>(() => {
@@ -96,8 +110,25 @@ export function ProjectListView({ nodes, onSelectNode }: ProjectListViewProps) {
 
   if (nodes.length === 0) {
     return (
-      <div className="h-full flex items-center justify-center text-muted-foreground text-sm">
-        아직 등록된 업무가 없습니다.
+      <div className="h-full flex flex-col items-center justify-center gap-3 text-muted-foreground text-sm">
+        <span>아직 등록된 업무가 없습니다.</span>
+        {projectId && (
+          <button
+            onClick={() => setImportOpen(true)}
+            className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:border-brand hover:text-brand"
+          >
+            <FileSpreadsheet className="h-3.5 w-3.5" />
+            엑셀로 가져오기
+          </button>
+        )}
+        {projectId && (
+          <ImportNodesDialog
+            projectId={projectId}
+            open={importOpen}
+            onOpenChange={setImportOpen}
+            onImported={() => onDataChange?.()}
+          />
+        )}
       </div>
     );
   }
@@ -107,11 +138,29 @@ export function ProjectListView({ nodes, onSelectNode }: ProjectListViewProps) {
       <div className="mx-auto max-w-5xl px-4 py-6">
         {/* 진척 요약 */}
         <div className="mb-6 rounded-xl border border-border bg-card p-5 shadow-sm">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-sm font-semibold text-foreground">사업 진척 현황</h2>
-            <span className="text-sm text-muted-foreground">
-              완료율 <span className="font-bold text-foreground">{summary.rate}%</span>
-            </span>
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
+            <h2 className="text-sm font-semibold text-foreground whitespace-nowrap">사업 진척 현황</h2>
+            <div className="flex items-center gap-2">
+              {projectId && (
+                <button
+                  onClick={() => setImportOpen(true)}
+                  className="inline-flex items-center gap-1 whitespace-nowrap rounded-md border border-border px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:border-brand hover:text-brand"
+                >
+                  <FileSpreadsheet className="h-3 w-3" />
+                  가져오기
+                </button>
+              )}
+              <button
+                onClick={() => exportNodesToXlsx(nodes, projectName || "프로젝트")}
+                className="inline-flex items-center gap-1 whitespace-nowrap rounded-md border border-border px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:border-brand hover:text-brand"
+              >
+                <Download className="h-3 w-3" />
+                내보내기
+              </button>
+              <span className="text-sm text-muted-foreground">
+                완료율 <span className="font-bold text-foreground">{summary.rate}%</span>
+              </span>
+            </div>
           </div>
           <div className="h-2 w-full rounded-full bg-muted overflow-hidden mb-4">
             <div
@@ -143,11 +192,11 @@ export function ProjectListView({ nodes, onSelectNode }: ProjectListViewProps) {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="text-left text-xs text-muted-foreground border-b border-border">
-                      <th className="px-5 py-2 font-medium">업무명</th>
-                      <th className="px-3 py-2 font-medium">담당자</th>
-                      <th className="px-3 py-2 font-medium">기한</th>
-                      <th className="px-3 py-2 font-medium">상태</th>
-                      <th className="px-3 py-2 font-medium">비고</th>
+                      <th className="px-5 py-2 font-medium whitespace-nowrap">업무명</th>
+                      <th className="px-3 py-2 font-medium whitespace-nowrap">담당자</th>
+                      <th className="px-3 py-2 font-medium whitespace-nowrap">기한</th>
+                      <th className="px-3 py-2 font-medium whitespace-nowrap">상태</th>
+                      <th className="px-3 py-2 font-medium whitespace-nowrap">비고</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -210,6 +259,15 @@ export function ProjectListView({ nodes, onSelectNode }: ProjectListViewProps) {
           ))}
         </div>
       </div>
+
+      {projectId && (
+        <ImportNodesDialog
+          projectId={projectId}
+          open={importOpen}
+          onOpenChange={setImportOpen}
+          onImported={() => onDataChange?.()}
+        />
+      )}
     </div>
   );
 }

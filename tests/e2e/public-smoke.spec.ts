@@ -4,7 +4,7 @@ test("login page renders and exposes Google auth provider", async ({ page, reque
   await page.goto("/login");
 
   await expect(page.getByText("Node")).toBeVisible();
-  await expect(page.getByRole("button", { name: "Sign in with Google" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Google로 로그인" })).toBeVisible();
 
   const providers = await request.get("/api/auth/providers");
   expect(providers.ok()).toBe(true);

@@ -53,7 +53,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
         <CardHeader className="space-y-1">
           <CardTitle className="text-2xl font-bold">Node</CardTitle>
           <CardDescription>
-            Sign in to manage your projects and track bottlenecks
+            과제 진행과 병목을 한눈에 관리하세요
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -64,7 +64,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
             }}
           >
             <Button type="submit" className="w-full bg-brand hover:bg-brand/90 text-brand-foreground">
-              Sign in with Google
+              Google로 로그인
             </Button>
           </form>
 

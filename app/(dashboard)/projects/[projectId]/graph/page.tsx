@@ -31,11 +31,11 @@ export default function GraphPage() {
   });
 
   if (isLoading) {
-    return <div className="text-center text-muted-foreground">Loading graph...</div>;
+    return <div className="text-center text-muted-foreground">그래프를 불러오는 중...</div>;
   }
 
   if (!data) {
-    return <div className="text-center text-muted-foreground">No data available</div>;
+    return <div className="text-center text-muted-foreground">데이터가 없습니다</div>;
   }
 
   const orgId = data.nodes[0]?.orgId;
@@ -68,6 +68,8 @@ export default function GraphPage() {
         {view === "briefing" ? (
           <ProjectBriefingView
             data={data}
+            projectId={projectId}
+            onDataChange={refetch}
             onSelectNode={(nodeId) => {
               setFocusNodeId(nodeId);
               setView("graph");
@@ -84,6 +86,8 @@ export default function GraphPage() {
         ) : (
           <ProjectListView
             nodes={data.nodes}
+            projectId={projectId}
+            onDataChange={refetch}
             onSelectNode={(nodeId) => {
               setFocusNodeId(nodeId);
               setView("graph");

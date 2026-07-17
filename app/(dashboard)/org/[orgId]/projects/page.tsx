@@ -201,11 +201,11 @@ export default function OrgProjectsPage() {
     <div className="space-y-5 sm:space-y-6">
       {/* Header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <h1 className="text-2xl font-bold sm:text-3xl">Projects</h1>
+        <h1 className="text-2xl font-bold sm:text-3xl">프로젝트</h1>
         <Button asChild className="w-full sm:w-auto">
           <Link href={`/org/${orgId}/projects/new`}>
             <Plus className="h-4 w-4 mr-2" />
-            New Project
+            새 프로젝트
           </Link>
         </Button>
       </div>
@@ -220,8 +220,8 @@ export default function OrgProjectsPage() {
             <FolderKanban className="h-12 w-12 mx-auto mb-4 opacity-50" />
             <p>
               {activeTab === "all"
-                ? "No projects yet. Create your first project to get started."
-                : `No projects in ${activeTab}.`}
+                ? "아직 프로젝트가 없습니다. 첫 프로젝트를 만들어 시작해 보세요."
+                : "해당 탭에 프로젝트가 없습니다."}
             </p>
           </div>
         ) : (
@@ -241,7 +241,7 @@ export default function OrgProjectsPage() {
                   <FolderSection
                     folder={{
                       id: "unfiled",
-                      name: "Unfiled",
+                      name: "미분류",
                       description: "Projects without a folder",
                       color: "#9ca3af",
                       orgId,

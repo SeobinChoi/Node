@@ -117,7 +117,7 @@ export function ProjectHeader({
                     <div
                         className="group flex min-w-0 flex-1 cursor-pointer items-center gap-2"
                         onClick={() => setIsEditing(true)}
-                        title="Click to edit"
+                        title="클릭해서 이름 수정"
                     >
                         <h1 className="min-w-0 truncate text-base font-semibold text-foreground sm:text-lg">{projectName}</h1>
                         <Pencil className="h-3.5 w-3.5 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
@@ -152,7 +152,7 @@ export function ProjectHeader({
                         variant="ghost"
                         size="sm"
                         className="h-8 px-3 hover:bg-accent"
-                        title="Share project"
+                        title="프로젝트 공유"
                         onClick={() => setShareOpen(true)}
                     >
                         <Share2 className="h-4 w-4 sm:mr-1.5" />
@@ -165,7 +165,7 @@ export function ProjectHeader({
                         size="sm"
                         className="h-8 w-8 p-0 hover:bg-accent"
                         onClick={handleFavoriteClick}
-                        title={favorite ? "Remove from favorites" : "Add to favorites"}
+                        title={favorite ? "즐겨찾기 해제" : "즐겨찾기 추가"}
                     >
                         <Star
                             className={cn(
@@ -184,7 +184,7 @@ export function ProjectHeader({
                                 variant="ghost"
                                 size="sm"
                                 className="h-8 w-8 p-0 hover:bg-accent"
-                                title="More options"
+                                title="더 보기"
                             >
                                 <MoreHorizontal className="h-4 w-4 text-muted-foreground" />
                             </Button>
@@ -207,7 +207,7 @@ export function ProjectHeader({
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem className="text-destructive">
-                                <span>Delete project</span>
+                                <span>프로젝트 삭제</span>
                             </DropdownMenuItem>
                         </DropdownMenuContent>
                     </DropdownMenu>

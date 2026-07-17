@@ -122,16 +122,16 @@ test.describe("authenticated workspace flow", () => {
       await expect(page.getByRole("button", { name: "Open workspace navigation" })).toBeVisible({ timeout: 15_000 });
       await page.getByRole("button", { name: "Open workspace navigation" }).click();
       await expect(page.getByRole("dialog", { name: "Workspace navigation" })).toBeVisible();
-      await expect(page.getByRole("link", { name: "Home" })).toBeVisible();
-      await expect(page.getByRole("link", { name: "Inbox" })).toBeVisible();
-      await page.getByRole("link", { name: "Projects" }).click();
+      await expect(page.getByRole("link", { name: "홈" })).toBeVisible();
+      await expect(page.getByRole("link", { name: "수신함" })).toBeVisible();
+      await page.getByRole("link", { name: "프로젝트" }).click();
       await expect(page.getByRole("dialog", { name: "Workspace navigation" })).toHaveCount(0);
       await expect(page.getByRole("link").filter({ hasText: project.name }).first()).toBeVisible({ timeout: 15_000 });
-      await expect(page.getByRole("link", { name: /New Project/ })).toBeVisible();
+      await expect(page.getByRole("link", { name: /새 프로젝트/ })).toBeVisible();
 
       await page.goto(`/org/${org.id}/projects/${project.id}/graph?nodeId=${sheetNode.id}`);
       await expect(page.getByRole("button", { name: "Open workspace navigation" })).toBeVisible({ timeout: 15_000 });
-      await expect(page.getByText("Saved").first()).toBeVisible({ timeout: 15_000 });
+      await expect(page.getByText("저장됨").first()).toBeVisible({ timeout: 15_000 });
       await page.getByRole("heading", { name: "E2E Task" }).click();
       await page.locator('button[aria-label="Open task details"]').click();
       await expect(page.getByRole("button", { name: "Delete node" })).toBeVisible();
@@ -139,7 +139,7 @@ test.describe("authenticated workspace flow", () => {
       await page.setViewportSize({ width: 1280, height: 720 });
 
       await page.goto(`/org/${org.id}/projects/${project.id}/graph?nodeId=${sheetNode.id}`);
-      await expect(page.getByText("Saved").first()).toBeVisible({ timeout: 15_000 });
+      await expect(page.getByText("저장됨").first()).toBeVisible({ timeout: 15_000 });
       await expect(page.getByRole("heading", { name: "Keyboard Delete Task" })).toBeVisible({ timeout: 15_000 });
       await expect(page.getByRole("heading", { name: "E2E Task" })).toBeVisible({ timeout: 15_000 });
 

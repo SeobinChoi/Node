@@ -32,11 +32,11 @@ export default function ProjectGraphPage() {
   });
 
   if (isLoading) {
-    return <div className="text-center text-muted-foreground">Loading graph...</div>;
+    return <div className="text-center text-muted-foreground">그래프를 불러오는 중...</div>;
   }
 
   if (!data) {
-    return <div className="text-center text-muted-foreground">No data available</div>;
+    return <div className="text-center text-muted-foreground">데이터가 없습니다</div>;
   }
 
   return (
@@ -67,6 +67,8 @@ export default function ProjectGraphPage() {
         {view === "briefing" ? (
           <ProjectBriefingView
             data={data}
+            projectId={projectId}
+            onDataChange={refetch}
             onSelectNode={(nodeId) => {
               setFocusNodeId(nodeId);
               setView("graph");
@@ -83,6 +85,8 @@ export default function ProjectGraphPage() {
         ) : (
           <ProjectListView
             nodes={data.nodes}
+            projectId={projectId}
+            onDataChange={refetch}
             onSelectNode={(nodeId) => {
               setFocusNodeId(nodeId);
               setView("graph");

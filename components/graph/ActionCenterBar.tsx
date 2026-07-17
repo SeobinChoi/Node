@@ -81,7 +81,7 @@ export function ActionCenterBar({
     const categories: ActionCategory[] = [
         {
             id: "actionable",
-            title: "Do Now",
+            title: "지금 할 일",
             icon: <CheckCircle2 className="h-3.5 w-3.5" />,
             colorClass: "text-blue-600",
             badgeClass: "bg-blue-50 text-blue-700",
@@ -89,7 +89,7 @@ export function ActionCenterBar({
         },
         {
             id: "waiting",
-            title: "Waiting",
+            title: "대기 중",
             icon: <Clock className="h-3.5 w-3.5" />,
             colorClass: "text-amber-600",
             badgeClass: "bg-amber-50 text-amber-700",
@@ -97,7 +97,7 @@ export function ActionCenterBar({
         },
         {
             id: "blocking",
-            title: "Blocking",
+            title: "막고 있음",
             icon: <Ban className="h-3.5 w-3.5" />,
             colorClass: "text-red-600",
             badgeClass: "bg-red-50 text-red-700",
@@ -127,30 +127,30 @@ export function ActionCenterBar({
                         saveStatus === "error" && "bg-red-50 text-red-600"
                     )}
                     title={saveStatus === "saved" ? saveStatusTitle : undefined}
-                    aria-label={`Save status: ${saveStatus === "saving" ? "Saving" : saveStatus === "error" ? "Save failed" : "Saved"}`}
+                    aria-label={`저장 상태: ${saveStatus === "saving" ? "저장 중" : saveStatus === "error" ? "저장 실패" : "저장됨"}`}
                     aria-live="polite"
                 >
                     {saveStatus === "saving" ? (
                         <>
                             <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                            <span>Saving...</span>
+                            <span>저장 중...</span>
                         </>
                     ) : saveStatus === "error" ? (
                         <>
                             <AlertCircle className="h-3.5 w-3.5" />
-                            <span>Save failed</span>
+                            <span>저장 실패</span>
                         </>
                     ) : (
                         <>
                             <CheckCircle2 className="h-3.5 w-3.5" />
-                            <span>Saved</span>
+                            <span>저장됨</span>
                         </>
                     )}
                 </div>
 
                 <div className="flex min-w-0 items-center gap-2">
                     <Zap className="h-4 w-4 text-brand" />
-                    <span className="truncate text-sm font-semibold text-foreground">Action Center</span>
+                    <span className="truncate text-sm font-semibold text-foreground">액션 센터</span>
                     {totalActions > 0 && (
                         <Badge variant="secondary" className="text-[10px] px-1.5 py-0 bg-brand-muted text-brand">
                             {totalActions}
@@ -241,12 +241,12 @@ export function ActionCenterBar({
                                 );
                             }) || (
                                 <div className="p-4 text-center text-sm text-muted-foreground">
-                                    No items in this category
+                                    해당 항목이 없습니다
                                 </div>
                             )}
                         {categories.find((c) => c.id === expandedCategory)?.items.length === 0 && (
                             <div className="p-4 text-center text-sm text-muted-foreground">
-                                No items in this category
+                                해당 항목이 없습니다
                             </div>
                         )}
                     </div>
