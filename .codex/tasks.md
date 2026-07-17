@@ -113,7 +113,12 @@
 - [x] Make the graph grid visible: draw snap-cell-sized "체스판" grid lines behind nodes (OrganizeDialog already defaults to GRID; GraphCanvas already snaps to [320,180]). Verified tsc/build.
 - [x] UI polish Phase 0: brand tokens (globals.css) + shared lib/ui/node-visuals.tsx; refactor ProjectListView/NodeDetailSheet.
 - [x] UI polish Phase 1: board card (CustomNode) — type-color strip, status pill, crisp states.
-- [ ] UI polish Phase 2: graph Toolbar — prominent brand Add Node, quieter secondary, cleaner panel.
+- [x] UI polish Phase 1 revision after user review: replace the type-color strip with a corner tag (icon + type label), tone colors down (new `TYPE_VISUALS[].tagClass`; BLOCKED accent 3px/red-500 → 2px/red-400), and center cards in their board cell via `components/graph/BoardCellsBackground.tsx` (custom pattern — reactflow v11 `<Background variant="lines">` ignores `offset`). Verified in-browser: gaps exactly 18/18 at zoom 1.0 and 0.779; tsc clean.
+- [ ] UI polish Phase 2: graph Toolbar — prominent brand Add Node, quieter secondary, cleaner panel. Follow the settled Phase-1 language: corner tag, toned-down tints, titles dominate.
 - [ ] UI polish Phase 3: ProjectListView — type icons in rows, tighter tiles/table.
 - [ ] UI polish Phase 4: app surfaces (ProjectCard, headers, Sidebar) adopt brand tokens + crisp spacing.
+- [x] Diagnose the app-wide "hang" (dev server / tsc / git status / prisma db push). Root cause: repo lived on the iCloud-synced Desktop with `node_modules` contents evicted to iCloud (`dataless`), ~1s per first-read (~880x slower than local disk); 47,838 files => ~13h per compile. Fixed by moving the repo to `/Users/xavi/Developer/Node` + fresh `npm install`. The old "Turbopack hangs" note was a misdiagnosis of this.
+- [x] Add a dev-only email login (no password) so local sign-in does not need Google OAuth. `Credentials` provider id `dev-login` in `auth.ts`, double-gated by `NODE_ENV !== "production"` && `ENABLE_DEV_LOGIN === "true"`; UI section on `/login`. Verified end-to-end: signs in and auto-creates the workspace.
+- [x] Whole-app UI 전면 개편: 브리핑|보드|목록 three switchable views (briefing default), rule-based briefing engine (`lib/briefing/derive-briefing.ts` + vitest 12/12), app-wide token migration (light sidebar via `--sidebar-*`, brand primaries, graph-colors centralized, MiniMap fix). Verified: tsc 0, eslint 0, e2e 10/10, browser-verified briefing headline/root-cause/deep-link on seeded board.
+- [ ] UI polish Phases 2–4 leftovers folded into the redesign; remaining deferred: dark-mode wiring, settings page 56-hex cleanup, public demo pages (deliberately untouched).
 - [ ] Save/keep .codex/context.md handoff current as work proceeds.
