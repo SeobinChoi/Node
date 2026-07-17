@@ -1,6 +1,8 @@
-import { signIn } from "@/auth";
+import { signIn, devLoginEnabled } from "@/auth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 interface LoginPageProps {
   searchParams: Promise<{ callbackUrl?: string }>;
@@ -61,10 +63,45 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
               await signIn("google", { redirectTo: redirectTo });
             }}
           >
-            <Button type="submit" className="w-full">
+            <Button type="submit" className="w-full bg-brand hover:bg-brand/90 text-brand-foreground">
               Sign in with Google
             </Button>
           </form>
+
+          {devLoginEnabled && (
+            <>
+              <div className="my-4 flex items-center gap-3">
+                <div className="h-px flex-1 bg-border" />
+                <span className="text-xs text-muted-foreground">개발 전용</span>
+                <div className="h-px flex-1 bg-border" />
+              </div>
+
+              <form
+                action={async (formData: FormData) => {
+                  "use server";
+                  const email = formData.get("email");
+                  await signIn("dev-login", {
+                    email: typeof email === "string" ? email : "",
+                    redirectTo,
+                  });
+                }}
+                className="space-y-2"
+              >
+                <Label htmlFor="dev-email">이메일로 로그인 (비밀번호 없음)</Label>
+                <Input
+                  id="dev-email"
+                  name="email"
+                  type="email"
+                  required
+                  placeholder="you@example.com"
+                  autoComplete="email"
+                />
+                <Button type="submit" variant="outline" className="w-full">
+                  개발자 로그인
+                </Button>
+              </form>
+            </>
+          )}
         </CardContent>
       </Card>
     </div>
