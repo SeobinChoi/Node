@@ -2,17 +2,15 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db/prisma";
 import { stripe } from "@/lib/stripe";
+import { isOrgAdmin } from "@/lib/utils/permissions";
 
 type SubscriptionWithPeriod = Awaited<ReturnType<NonNullable<typeof stripe>["subscriptions"]["retrieve"]>> & {
     current_period_end?: number | null;
 };
 
 export async function POST(req: NextRequest) {
-    console.log("[verify-session] Starting verification");
-
     try {
         if (!stripe) {
-            console.error("[verify-session] Stripe not configured");
             return NextResponse.json(
                 { error: "Stripe is not configured" },
                 { status: 503 }
@@ -26,54 +24,51 @@ export async function POST(req: NextRequest) {
         }
 
         const body = await req.json();
-        console.log("[verify-session] Request body:", body);
 
         const { sessionId, orgId } = body;
         if (!sessionId || !orgId) {
-            console.error("[verify-session] Missing sessionId or orgId");
             return NextResponse.json(
                 { error: "Session ID and Org ID are required" },
                 { status: 400 }
             );
         }
 
-        // Verify user is member of the organization
-        const org = await prisma.organization.findFirst({
-            where: {
-                id: orgId,
-                OR: [
-                    { ownerId: session.user.id },
-                    {
-                        members: {
-                            some: {
-                                userId: session.user.id,
-                            },
-                        },
-                    },
-                ],
-            },
+        const org = await prisma.organization.findUnique({
+            where: { id: orgId },
         });
 
         if (!org) {
-            console.error("[verify-session] Organization not found or access denied", { orgId, userId: session.user.id });
             return NextResponse.json(
-                { error: "Organization not found or access denied" },
+                { error: "Organization not found" },
                 { status: 404 }
             );
         }
 
-        console.log("[verify-session] Retrieving checkout session from Stripe", sessionId);
+        // Only the org owner or an active ADMIN member may confirm billing.
+        const canManageBilling =
+            org.ownerId === session.user.id || (await isOrgAdmin(orgId, session.user.id));
+        if (!canManageBilling) {
+            return NextResponse.json(
+                { error: "Organization admin access required" },
+                { status: 403 }
+            );
+        }
 
         // Retrieve the checkout session from Stripe
         const checkoutSession = await stripe.checkout.sessions.retrieve(sessionId);
 
-        console.log("[verify-session] Checkout session retrieved", {
-            payment_status: checkoutSession.payment_status,
-            subscription: checkoutSession.subscription,
-        });
+        // Bind the session to this org: the checkout route stamps metadata.orgId,
+        // so a session created for a different org (or replayed) must be rejected.
+        // Without this, any admin could mark their org Pro using another org's
+        // paid session id.
+        if (checkoutSession.metadata?.orgId !== orgId) {
+            return NextResponse.json(
+                { error: "Checkout session does not belong to this organization" },
+                { status: 403 }
+            );
+        }
 
         if (checkoutSession.payment_status !== "paid") {
-            console.error("[verify-session] Payment not completed", checkoutSession.payment_status);
             return NextResponse.json(
                 { error: "Payment not completed" },
                 { status: 400 }
@@ -83,21 +78,13 @@ export async function POST(req: NextRequest) {
         // Get subscription details
         const subscriptionId = checkoutSession.subscription as string;
         if (!subscriptionId) {
-            console.error("[verify-session] No subscription in session");
             return NextResponse.json(
                 { error: "No subscription found in session" },
                 { status: 400 }
             );
         }
 
-        console.log("[verify-session] Retrieving subscription from Stripe", subscriptionId);
-
         const subscription = await stripe.subscriptions.retrieve(subscriptionId) as SubscriptionWithPeriod;
-
-        console.log("[verify-session] Subscription retrieved", {
-            status: subscription.status,
-            current_period_end: subscription.current_period_end,
-        });
 
         // Update organization with subscription details
         await prisma.organization.update({
@@ -112,8 +99,6 @@ export async function POST(req: NextRequest) {
                     : null,
             },
         });
-
-        console.log(`[verify-session] ✅ Subscription verified and updated for org ${orgId}`);
 
         return NextResponse.json({ success: true });
     } catch (error) {

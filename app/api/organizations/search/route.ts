@@ -1,14 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { requireAuth } from "@/lib/utils/auth";
+import { ACTIVE_ORG_MEMBER_STATUSES } from "@/lib/utils/permissions";
 
 /**
  * GET /api/organizations/search?q=...
- * Search for organizations by name for onboarding
+ * Search the caller's own organizations by name.
+ *
+ * NOTE: previously this returned EVERY organization in the system matching a
+ * 2-char substring (id + name) to any authenticated user — a cross-tenant
+ * enumeration leak. Results are now scoped to orgs the caller actively belongs
+ * to. Onboarding joins go through invite codes (/invite/[code]), not this route.
  */
 export async function GET(request: NextRequest) {
     try {
-        await requireAuth();
+        const user = await requireAuth();
         const { searchParams } = new URL(request.url);
         const query = searchParams.get("q");
 
@@ -21,6 +27,12 @@ export async function GET(request: NextRequest) {
                 name: {
                     contains: query,
                     mode: "insensitive",
+                },
+                members: {
+                    some: {
+                        userId: user.id,
+                        status: { in: [...ACTIVE_ORG_MEMBER_STATUSES] },
+                    },
                 },
             },
             select: {

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db/prisma";
 import { stripe } from "@/lib/stripe";
+import { isOrgAdmin } from "@/lib/utils/permissions";
 
 export async function POST(req: NextRequest) {
     try {
@@ -25,27 +26,25 @@ export async function POST(req: NextRequest) {
             );
         }
 
-        // Verify user is member of the organization
-        const org = await prisma.organization.findFirst({
-            where: {
-                id: orgId,
-                OR: [
-                    { ownerId: session.user.id },
-                    {
-                        members: {
-                            some: {
-                                userId: session.user.id,
-                            },
-                        },
-                    },
-                ],
-            },
+        const org = await prisma.organization.findUnique({
+            where: { id: orgId },
         });
 
         if (!org) {
             return NextResponse.json(
-                { error: "Organization not found or access denied" },
+                { error: "Organization not found" },
                 { status: 404 }
+            );
+        }
+
+        // The billing portal can cancel the subscription and change the payment
+        // method, so restrict it to the org owner or an active ADMIN member.
+        const canManageBilling =
+            org.ownerId === session.user.id || (await isOrgAdmin(orgId, session.user.id));
+        if (!canManageBilling) {
+            return NextResponse.json(
+                { error: "Organization admin access required" },
+                { status: 403 }
             );
         }
 

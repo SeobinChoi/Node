@@ -5,40 +5,33 @@ import { assignToDefaultTeam } from "@/lib/utils/teams";
 import { z } from "zod";
 
 const joinOrgSchema = z.object({
-    orgId: z.string().optional(),
-    inviteCode: z.string().optional(),
+    inviteCode: z.string().min(1, "Invite code is required"),
 });
 
 /**
  * POST /api/organizations/join
- * Submit a request to join an organization or join directly via invite code
+ * Join an organization via a valid invite code.
+ *
+ * NOTE: joining by raw orgId was removed. It let any authenticated user insert
+ * a membership row into ANY organization (spamming admin inboxes and serving as
+ * the pivot for the billing-portal takeover chain). Membership now requires
+ * possession of the org's invite code, matching the /invite/[code] onboarding.
  */
 export async function POST(request: NextRequest) {
     try {
         const user = await requireAuth();
         const body = await request.json();
-        const { orgId: bodyOrgId, inviteCode } = joinOrgSchema.parse(body);
+        const { inviteCode } = joinOrgSchema.parse(body);
 
-        let targetOrgId = bodyOrgId;
-        let autoApprove = false;
-
-        if (inviteCode) {
-            const org = await prisma.organization.findUnique({
-                where: { inviteCode },
-                select: { id: true }
-            });
-            if (!org) {
-                return NextResponse.json({ error: "Invalid invite code" }, { status: 400 });
-            }
-            targetOrgId = org.id;
-            autoApprove = true;
+        const org = await prisma.organization.findUnique({
+            where: { inviteCode },
+            select: { id: true },
+        });
+        if (!org) {
+            return NextResponse.json({ error: "Invalid invite code" }, { status: 400 });
         }
 
-        if (!targetOrgId) {
-            return NextResponse.json({ error: "Organization ID or invite code is required" }, { status: 400 });
-        }
-
-        const orgId = targetOrgId;
+        const orgId = org.id;
 
         // Check if user already has a membership in this org
         const existingMembership = await prisma.orgMember.findUnique({
@@ -57,23 +50,19 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        // Create a membership with appropriate status
         const orgMember = await prisma.orgMember.create({
             data: {
                 orgId,
                 userId: user.id,
                 role: "MEMBER",
-                status: autoApprove ? "ACTIVE" : "PENDING_APPROVAL",
+                status: "ACTIVE",
             },
         });
 
-        // Automatically assign to default team if approved
-        if (autoApprove) {
-            await assignToDefaultTeam(orgId, user.id);
-        }
+        await assignToDefaultTeam(orgId, user.id);
 
         return NextResponse.json({
-            message: "Join request submitted successfully",
+            message: "Joined organization successfully",
             membershipId: orgMember.id,
         });
     } catch (error) {
