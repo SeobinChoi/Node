@@ -53,7 +53,7 @@ export async function POST(
       return NextResponse.json({ error: "Project not found" }, { status: 404 });
     }
 
-    await assertWithinNodeLimit(project.orgId);
+    await assertWithinNodeLimit(project.orgId, rows.length);
 
     // 담당자 이름 → 프로젝트 멤버 매칭 테이블
     const members = await prisma.projectMember.findMany({
@@ -118,6 +118,12 @@ export async function POST(
     }
     if (error instanceof Error && error.message.includes("Not a member")) {
       return NextResponse.json({ error: error.message }, { status: 403 });
+    }
+    if (error instanceof Error && error.message.includes("Free tier limit reached")) {
+      return NextResponse.json(
+        { error: "LIMIT_REACHED", message: error.message, limit: 20 },
+        { status: 403 }
+      );
     }
     console.error("POST /api/projects/[projectId]/nodes/bulk error:", error);
     return NextResponse.json({ error: "일괄 등록에 실패했습니다" }, { status: 500 });

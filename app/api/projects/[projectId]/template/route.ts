@@ -57,7 +57,7 @@ export async function POST(
       );
     }
 
-    await assertWithinNodeLimit(project.orgId);
+    await assertWithinNodeLimit(project.orgId, TEMPLATE_NODES.length);
 
     const now = Date.now();
     const created = await prisma.$transaction(async (tx) => {
@@ -97,6 +97,12 @@ export async function POST(
   } catch (error) {
     if (error instanceof Error && error.message.includes("Not a member")) {
       return NextResponse.json({ error: error.message }, { status: 403 });
+    }
+    if (error instanceof Error && error.message.includes("Free tier limit reached")) {
+      return NextResponse.json(
+        { error: "LIMIT_REACHED", message: error.message, limit: 20 },
+        { status: 403 }
+      );
     }
     console.error("POST /api/projects/[projectId]/template error:", error);
     return NextResponse.json({ error: "템플릿 적용에 실패했습니다" }, { status: 500 });

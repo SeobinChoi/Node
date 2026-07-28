@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/db/prisma";
 import { requireAuth } from "@/lib/utils/auth";
 import { requireProjectEdit } from "@/lib/utils/permissions";
+import { assertWithinNodeLimit } from "@/lib/subscription";
 import { authOrPermissionErrorResponse } from "@/lib/utils/api-error-responses";
 import { createActivityLog } from "@/lib/utils/activity-log";
 import { EdgeRelation, ManualStatus, NodeType } from "@/types";
@@ -67,6 +68,24 @@ export async function POST(
 
     const body = await request.json();
     const { nodes, edges, childParentRestores } = RestoreGraphSchema.parse(body);
+
+    // Enforce the free-tier node limit for the nodes this restore would newly
+    // create (restore accepts a browser-supplied node list, so it is a create
+    // path too). Nodes that already exist are skipped below, so only count the
+    // genuinely-new ones — this avoids over-blocking a legitimate undo.
+    const restorablePayloadIds = nodes
+      .filter((node) => node.projectId === projectId && node.orgId === project.orgId)
+      .map((node) => node.id);
+    if (restorablePayloadIds.length > 0) {
+      const alreadyPresent = await prisma.node.count({
+        where: { id: { in: restorablePayloadIds }, projectId },
+      });
+      const newNodeCount = restorablePayloadIds.length - alreadyPresent;
+      if (newNodeCount > 0) {
+        await assertWithinNodeLimit(project.orgId, newNodeCount);
+      }
+    }
+
     const nodeIdSet = new Set(nodes.map((node) => node.id));
     const nodeById = new Map(nodes.map((node) => [node.id, node]));
     const restoreDepth = (nodeId: string) => {
@@ -208,6 +227,13 @@ export async function POST(
 
     const authResponse = authOrPermissionErrorResponse(error);
     if (authResponse) return authResponse;
+
+    if (error instanceof Error && error.message.includes("Free tier limit reached")) {
+      return NextResponse.json(
+        { error: "LIMIT_REACHED", message: error.message, limit: 20 },
+        { status: 403 }
+      );
+    }
 
     console.error("POST /api/projects/[projectId]/graph/restore error:", error);
     return NextResponse.json({ error: "Failed to restore graph items" }, { status: 500 });

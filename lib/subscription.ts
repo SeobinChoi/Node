@@ -29,10 +29,26 @@ export async function isOrgPro(orgId: string): Promise<boolean> {
 }
 
 /**
- * Check if an organization can create a new node
- * @throws Error if limit is exceeded
+ * Count the nodes that actually exist in an organization.
+ *
+ * The denormalized `organization.nodeCount` column is NOT a reliable source of
+ * truth: bulk import / template creates historically skipped the increment, node
+ * deletes decrement without a floor (so it drifts negative), and cascade deletes
+ * from project/org removal never decrement it at all. Enforcement therefore
+ * counts real rows — the same thing the billing page already displays — so no
+ * write path can silently unlock the paid tier by desyncing a counter.
  */
-export async function assertWithinNodeLimit(orgId: string): Promise<void> {
+async function countOrgNodes(orgId: string): Promise<number> {
+    return prisma.node.count({ where: { orgId } });
+}
+
+/**
+ * Check if an organization can create `addCount` more nodes.
+ * @param orgId organization to check
+ * @param addCount how many nodes are about to be created (default 1)
+ * @throws Error if creating them would exceed the free-tier limit
+ */
+export async function assertWithinNodeLimit(orgId: string, addCount = 1): Promise<void> {
     const isPro = await isOrgPro(orgId);
 
     if (isPro) {
@@ -40,17 +56,9 @@ export async function assertWithinNodeLimit(orgId: string): Promise<void> {
         return;
     }
 
-    // For free tier, check nodeCount
-    const org = await prisma.organization.findUnique({
-        where: { id: orgId },
-        select: { nodeCount: true },
-    });
+    const currentCount = await countOrgNodes(orgId);
 
-    if (!org) {
-        throw new Error("Organization not found");
-    }
-
-    if (org.nodeCount >= FREE_NODE_LIMIT) {
+    if (currentCount + addCount > FREE_NODE_LIMIT) {
         throw new Error(
             `Free tier limit reached. You can create up to ${FREE_NODE_LIMIT} nodes. Please upgrade to continue.`
         );
@@ -68,14 +76,7 @@ export async function hasReachedNodeLimit(orgId: string): Promise<boolean> {
         return false;
     }
 
-    const org = await prisma.organization.findUnique({
-        where: { id: orgId },
-        select: { nodeCount: true },
-    });
+    const currentCount = await countOrgNodes(orgId);
 
-    if (!org) {
-        return true;
-    }
-
-    return org.nodeCount >= FREE_NODE_LIMIT;
+    return currentCount >= FREE_NODE_LIMIT;
 }
