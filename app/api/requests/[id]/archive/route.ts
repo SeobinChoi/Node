@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
-import { requireAuth, isOrgMember } from "@/lib/utils/auth";
+import { requireAuth } from "@/lib/utils/auth";
+import { isOrgAdmin } from "@/lib/utils/permissions";
 
 // PATCH /api/requests/[requestId]/archive - Archive a request
 export async function PATCH(
@@ -13,14 +14,20 @@ export async function PATCH(
 
         const req = await prisma.request.findUnique({
             where: { id },
-            select: { orgId: true },
+            select: { orgId: true, fromUserId: true, toUserId: true },
         });
 
         if (!req) {
             return NextResponse.json({ error: "Request not found" }, { status: 404 });
         }
 
-        if (!(await isOrgMember(req.orgId, user.id))) {
+        // isArchived is a global flag on the request, so restrict archiving to a
+        // participant (creator or assignee) or an org admin.
+        const canArchive =
+            req.fromUserId === user.id ||
+            req.toUserId === user.id ||
+            (await isOrgAdmin(req.orgId, user.id));
+        if (!canArchive) {
             return NextResponse.json({ error: "Forbidden" }, { status: 403 });
         }
 

@@ -41,11 +41,41 @@ export async function PUT(request: NextRequest) {
             return NextResponse.json({ error: "Forbidden" }, { status: 403 });
         }
 
-        // Use transaction to update all
+        // Every folder being reordered must belong to this org — otherwise a
+        // caller could reorder / reparent another tenant's folders by id.
+        const itemIds = items.map((item) => item.id);
+        if (itemIds.length > 0) {
+            const ownedCount = await prisma.folder.count({
+                where: { id: { in: itemIds }, orgId },
+            });
+            if (ownedCount !== itemIds.length) {
+                return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+            }
+        }
+
+        // Any destination parent folder must also belong to this org.
+        const targetParentIds = [
+            ...new Set(
+                items
+                    .map((item) => item.parentId)
+                    .filter((parentId): parentId is string => Boolean(parentId))
+            ),
+        ];
+        if (targetParentIds.length > 0) {
+            const ownedParents = await prisma.folder.count({
+                where: { id: { in: targetParentIds }, orgId },
+            });
+            if (ownedParents !== targetParentIds.length) {
+                return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+            }
+        }
+
+        // Use transaction to update all. updateMany is scoped by orgId as a
+        // defense-in-depth backstop even though ownership is verified above.
         await prisma.$transaction(
             items.map((item) =>
-                prisma.folder.update({
-                    where: { id: item.id },
+                prisma.folder.updateMany({
+                    where: { id: item.id, orgId },
                     data: {
                         sortOrder: item.order,
                         ...(item.parentId !== undefined ? { parentId: item.parentId } : {})

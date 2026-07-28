@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/utils/auth";
+import { isOrgMember } from "@/lib/utils/permissions";
 import { prisma } from "@/lib/db/prisma";
 import { computeAllNodeStatuses } from "@/lib/status/compute-status";
 import {
@@ -23,6 +24,13 @@ export async function GET(req: Request) {
 
         if (!orgId) {
             return NextResponse.json({ error: "Org ID required" }, { status: 400 });
+        }
+
+        // The caller must be an active member of the org — orgId comes straight
+        // from the query string, so without this any logged-in user could read
+        // another org's entire task graph (and force full-table scans).
+        if (!(await isOrgMember(orgId, user.id))) {
+            return NextResponse.json({ error: "Forbidden" }, { status: 403 });
         }
 
         // 1. Fetch all nodes, edges, requests for the organization

@@ -22,10 +22,23 @@ export async function PATCH(request: NextRequest) {
             return NextResponse.json({ error: "Forbidden" }, { status: 403 });
         }
 
+        // The destination folder (if any) must belong to the same org — otherwise
+        // an item could be reparented into another tenant's folder tree.
+        if (destinationParentId) {
+            const destFolder = await prisma.folder.findFirst({
+                where: { id: destinationParentId, orgId },
+                select: { id: true },
+            });
+            if (!destFolder) {
+                return NextResponse.json({ error: "Destination folder not found" }, { status: 404 });
+            }
+        }
+
         if (itemType === "PROJECT") {
-            // Get project name to check for conflicts
-            const project = await prisma.project.findUnique({
-                where: { id: itemId },
+            // Get project name to check for conflicts (scoped to the claimed org so
+            // a foreign project id cannot be moved across tenants).
+            const project = await prisma.project.findFirst({
+                where: { id: itemId, orgId },
                 select: { name: true }
             });
 
@@ -96,9 +109,10 @@ export async function PATCH(request: NextRequest) {
                 }
             }
 
-            // Get folder name to check for conflicts
-            const movingFolder = await prisma.folder.findUnique({
-                where: { id: itemId },
+            // Get folder name to check for conflicts (scoped to the claimed org so
+            // a foreign folder id cannot be moved across tenants).
+            const movingFolder = await prisma.folder.findFirst({
+                where: { id: itemId, orgId },
                 select: { name: true }
             });
 

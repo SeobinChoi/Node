@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
-import { requireAuth, isOrgMember } from "@/lib/utils/auth";
+import { requireAuth } from "@/lib/utils/auth";
+import { isOrgAdmin } from "@/lib/utils/permissions";
 
 // DELETE /api/requests/[requestId] - Delete a request
 export async function DELETE(
@@ -20,7 +21,11 @@ export async function DELETE(
             return NextResponse.json({ error: "Request not found" }, { status: 404 });
         }
 
-        if (!(await isOrgMember(req.orgId, user.id))) {
+        // Only the request creator or an org admin may delete it — not any
+        // member of the org.
+        const canDelete =
+            req.fromUserId === user.id || (await isOrgAdmin(req.orgId, user.id));
+        if (!canDelete) {
             return NextResponse.json({ error: "Forbidden" }, { status: 403 });
         }
 

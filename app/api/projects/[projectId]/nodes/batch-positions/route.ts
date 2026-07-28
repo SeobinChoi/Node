@@ -37,11 +37,14 @@ export async function PATCH(
             return NextResponse.json({ error: "Project not found" }, { status: 404 });
         }
 
-        // Update all positions in a transaction
-        await prisma.$transaction(
+        // Update all positions in a transaction. Each update is scoped to this
+        // project so a foreign nodeId cannot move another project's (or another
+        // tenant's) nodes — updateMany simply affects 0 rows for ids that do not
+        // belong to projectId.
+        const results = await prisma.$transaction(
             positions.map((pos) =>
-                prisma.node.update({
-                    where: { id: pos.nodeId },
+                prisma.node.updateMany({
+                    where: { id: pos.nodeId, projectId },
                     data: {
                         positionX: pos.x,
                         positionY: pos.y,
@@ -50,9 +53,11 @@ export async function PATCH(
             )
         );
 
+        const updated = results.reduce((sum, r) => sum + r.count, 0);
+
         return NextResponse.json({
             success: true,
-            updated: positions.length,
+            updated,
         });
     } catch (error) {
         console.error("Batch positions error:", error);
