@@ -2,6 +2,23 @@ import { prisma } from "@/lib/db/prisma";
 
 const FREE_NODE_LIMIT = 20;
 
+const DAY_MS = 86_400_000;
+
+/** Slack after period end for an otherwise-healthy subscription. */
+const RENEWAL_GRACE_MS = DAY_MS;
+
+/**
+ * How long a `past_due` org keeps Pro access while Stripe retries the payment.
+ *
+ * Stripe's Smart Retries run for roughly three weeks before giving up. Treating
+ * the FIRST failed charge as an instant downgrade cuts off customers who are
+ * still going to pay (a card that expired over a weekend), turning recoverable
+ * involuntary churn into hard churn. We keep access during the dunning window
+ * and only drop once Stripe itself gives up (status becomes `unpaid`/`canceled`,
+ * neither of which is treated as Pro below).
+ */
+const DUNNING_GRACE_MS = 14 * DAY_MS;
+
 /**
  * Check if an organization has an active subscription (Pro tier)
  */
@@ -16,16 +33,24 @@ export async function isOrgPro(orgId: string): Promise<boolean> {
 
     if (!org) return false;
 
-    const validStatuses = ["active", "trialing"];
-    const hasValidStatus =
-        org.stripeSubscriptionStatus &&
-        validStatuses.includes(org.stripeSubscriptionStatus);
+    const status = org.stripeSubscriptionStatus;
+    if (!status) return false;
 
-    const isNotExpired =
-        !org.stripeCurrentPeriodEnd ||
-        org.stripeCurrentPeriodEnd.getTime() + 86_400_000 > Date.now(); // Add 1 day grace period
+    const periodEndMs = org.stripeCurrentPeriodEnd?.getTime() ?? null;
+    const withinGrace = (graceMs: number) =>
+        periodEndMs === null || periodEndMs + graceMs > Date.now();
 
-    return Boolean(hasValidStatus && isNotExpired);
+    if (status === "active" || status === "trialing") {
+        return withinGrace(RENEWAL_GRACE_MS);
+    }
+
+    // Payment failed but Stripe is still retrying — keep access during dunning.
+    if (status === "past_due") {
+        return withinGrace(DUNNING_GRACE_MS);
+    }
+
+    // canceled / unpaid / incomplete / incomplete_expired / paused => not Pro.
+    return false;
 }
 
 /**

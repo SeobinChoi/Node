@@ -15,9 +15,10 @@ vi.mock("@/lib/db/prisma", () => ({
   },
 }));
 
-import { assertWithinNodeLimit, hasReachedNodeLimit } from "@/lib/subscription";
+import { assertWithinNodeLimit, hasReachedNodeLimit, isOrgPro } from "@/lib/subscription";
 
 const FREE_LIMIT = 20;
+const DAY_MS = 86_400_000;
 
 function makeFreeOrg() {
   // No active subscription => free tier.
@@ -80,6 +81,60 @@ describe("assertWithinNodeLimit", () => {
     nodeCount.mockResolvedValue(5);
     await assertWithinNodeLimit("org-123", 1);
     expect(nodeCount).toHaveBeenCalledWith({ where: { orgId: "org-123" } });
+  });
+});
+
+describe("isOrgPro", () => {
+  function orgWith(status: string | null, periodEndOffsetMs: number | null) {
+    orgFindUnique.mockResolvedValue({
+      stripeSubscriptionStatus: status,
+      stripeCurrentPeriodEnd:
+        periodEndOffsetMs === null ? null : new Date(Date.now() + periodEndOffsetMs),
+    });
+  }
+
+  it("is false for an org with no subscription", async () => {
+    orgWith(null, null);
+    await expect(isOrgPro("org")).resolves.toBe(false);
+  });
+
+  it("is true for an active subscription in its paid period", async () => {
+    orgWith("active", 10 * DAY_MS);
+    await expect(isOrgPro("org")).resolves.toBe(true);
+  });
+
+  it("is true while trialing", async () => {
+    orgWith("trialing", 5 * DAY_MS);
+    await expect(isOrgPro("org")).resolves.toBe(true);
+  });
+
+  it("is false once an active subscription is well past its period end", async () => {
+    orgWith("active", -10 * DAY_MS);
+    await expect(isOrgPro("org")).resolves.toBe(false);
+  });
+
+  it("keeps access during dunning so Stripe retries can still succeed", async () => {
+    // Payment failed 3 days ago; Stripe Smart Retries are still running.
+    orgWith("past_due", -3 * DAY_MS);
+    await expect(isOrgPro("org")).resolves.toBe(true);
+  });
+
+  it("drops access once the dunning window has fully elapsed", async () => {
+    orgWith("past_due", -20 * DAY_MS);
+    await expect(isOrgPro("org")).resolves.toBe(false);
+  });
+
+  it("is false for canceled and unpaid subscriptions", async () => {
+    orgWith("canceled", 10 * DAY_MS);
+    await expect(isOrgPro("org")).resolves.toBe(false);
+
+    orgWith("unpaid", 10 * DAY_MS);
+    await expect(isOrgPro("org")).resolves.toBe(false);
+  });
+
+  it("is false for an incomplete checkout that never paid", async () => {
+    orgWith("incomplete", 10 * DAY_MS);
+    await expect(isOrgPro("org")).resolves.toBe(false);
   });
 });
 
