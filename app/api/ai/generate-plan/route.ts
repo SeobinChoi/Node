@@ -12,6 +12,17 @@ const GeneratePlanSchema = z.object({
     feedback: z.string().optional(), // For regeneration with feedback
 });
 
+/**
+ * Daily AI generations allowed on the free tier.
+ *
+ * This used to be 99/day at max_tokens 4000 — while the other eight AI routes
+ * hard-403 non-Pro users. That made the flagship AI feature effectively free
+ * (and unbounded, since a user can create unlimited orgs), undercutting the paid
+ * tier it is meant to sell. Kept as a genuine taster so prospects can see the
+ * feature work; tune this number as a pricing decision.
+ */
+const FREE_DAILY_PLAN_GENERATIONS = 5;
+
 export interface GeneratedPlanNode {
     tempId: string;
     title: string;
@@ -77,9 +88,11 @@ export async function POST(req: NextRequest) {
             },
         });
 
-        if (!isPro && dailyUsageCount >= 99) {
+        if (!isPro && dailyUsageCount >= FREE_DAILY_PLAN_GENERATIONS) {
             return NextResponse.json(
-                { error: "Free plan is limited to 99 AI generations per day. Upgrade to Pro for unlimited access." },
+                {
+                    error: `Free plan is limited to ${FREE_DAILY_PLAN_GENERATIONS} AI generations per day. Upgrade to Pro for unlimited access.`,
+                },
                 { status: 403 }
             );
         }

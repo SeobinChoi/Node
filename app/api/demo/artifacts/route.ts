@@ -1,34 +1,37 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import {
-    listDemoArtifacts,
     normalizeDemoService,
     saveDemoArtifact,
     type PublicDemoResult,
 } from "@/lib/ai/public-demo-service";
+import { isPublicAiDemoEnabled, publicDemoDisabledResponse } from "@/lib/ai/demo-gate";
 
 const SaveSchema = z.object({
     service: z.string().min(1).max(40),
-    sourceText: z.string().min(1).max(12000),
+    sourceText: z.string().min(1).max(4000),
     result: z.object({}).passthrough(),
 });
 
-export async function GET(req: NextRequest) {
-    try {
-        const { searchParams } = new URL(req.url);
-        const service = searchParams.get("service");
-        const limit = Number(searchParams.get("limit") || 8);
-        const artifacts = await listDemoArtifacts(service ? normalizeDemoService(service) : undefined, limit);
-
-        return NextResponse.json({ ok: true, artifacts });
-    } catch (error) {
-        console.error("Public Demo Artifact List Error:", error);
-        return NextResponse.json({ error: "Failed to load saved demo artifacts" }, { status: 500 });
-    }
+/**
+ * GET no longer returns saved artifacts.
+ *
+ * Demo visitors are anonymous, so there is no identity to scope a listing to —
+ * the previous implementation returned the most recent artifacts from ALL
+ * visitors. Anyone pasting a real internal document into the public demo had the
+ * generated write-up of it served to every other visitor. Since we cannot tell
+ * "mine" from "someone else's" here, we serve nothing rather than leak.
+ */
+export async function GET() {
+    return NextResponse.json({ ok: true, artifacts: [] });
 }
 
 export async function POST(req: NextRequest) {
     try {
+        if (!isPublicAiDemoEnabled()) {
+            return publicDemoDisabledResponse();
+        }
+
         const body = SaveSchema.parse(await req.json());
         const artifact = await saveDemoArtifact({
             service: normalizeDemoService(body.service),
