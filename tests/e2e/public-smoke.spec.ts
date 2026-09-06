@@ -60,6 +60,13 @@ test("public service demos load and respond to sample-data actions", async ({ pa
   }
 });
 
+test("bare auth middleware still rejects protected routes", async ({ page }) => {
+  for (const path of ["/", "/projects/private", "/org/private"]) {
+    await page.goto(path);
+    await expect(page).toHaveURL(/\/login(?:\?|$)/);
+  }
+});
+
 test("public demos do not initialize an authentication session", async ({ page }) => {
   const authSessionRequests: string[] = [];
   page.on("request", (request) => {

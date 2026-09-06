@@ -1,13 +1,11 @@
-import NextAuth, { type NextAuthRequest } from "next-auth";
-import { NextResponse, type NextFetchEvent, type NextRequest } from "next/server";
+import NextAuth from "next-auth";
+import { NextResponse, type NextFetchEvent, type NextMiddleware, type NextRequest } from "next/server";
 import { authConfig } from "./auth.config";
 import { publicDemoRoutes } from "./lib/public-demo-routes";
 
-const authenticatedProxy = NextAuth(authConfig).auth((request: NextAuthRequest, event: NextFetchEvent) => {
-  void request;
-  void event;
-  return NextResponse.next();
-});
+// Auth.js types omit the direct NextMiddleware overload that Next.js uses when
+// `auth` is exported bare, but the runtime function implements that contract.
+const authenticatedProxy = NextAuth(authConfig).auth as NextMiddleware;
 
 export default function proxy(request: NextRequest, event: NextFetchEvent) {
   if (publicDemoRoutes.has(request.nextUrl.pathname)) return NextResponse.next();
