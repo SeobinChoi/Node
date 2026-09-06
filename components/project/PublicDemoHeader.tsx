@@ -54,7 +54,9 @@ export function PublicDemoHeader({
             <p className="text-xs font-semibold text-white/75">Node 업무지원 공개 시연</p>
             <h1 className="truncate text-xl font-semibold tracking-normal text-white">{title}</h1>
             <p className="mt-1 text-sm leading-5 text-white/80">
-              로그인 없이 생성, 저장, 내보내기를 확인하는 담당자 시연 화면
+              {variant === "opsRadar"
+                ? "로그인 없이 업무 평가, 병목 해소, 보고 내보내기를 확인하는 시연 화면"
+                : "로그인 없이 생성, 저장, 내보내기를 확인하는 담당자 시연 화면"}
             </p>
           </div>
         </div>
