@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { PublicServiceDemoClient } from "@/components/project/PublicServiceDemoClient";
+import { OpsRadarDemoClient } from "@/components/project/ops-radar/OpsRadarDemoClient";
 
 export const metadata: Metadata = {
   title: "Ops Radar Demo | Node",
@@ -8,5 +8,5 @@ export const metadata: Metadata = {
 };
 
 export default function OpsRadarDemoPage() {
-  return <PublicServiceDemoClient variant="opsRadar" />;
+  return <OpsRadarDemoClient />;
 }

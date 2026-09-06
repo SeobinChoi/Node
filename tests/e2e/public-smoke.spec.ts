@@ -39,8 +39,12 @@ test("public military AI demo generates output and saves a node", async ({ page 
 });
 
 test("public service demos load and respond to sample-data actions", async ({ page }) => {
+  await page.goto("/ops-radar-demo");
+  await expect(page.getByRole("main").getByRole("heading", { name: "작전 과업 병목관리" })).toBeVisible();
+  await page.getByRole("button", { name: "업무 평가 실행" }).click();
+  await expect(page.getByTestId("ops-radar-detail")).toBeVisible();
+
   const demos = [
-    { path: "/ops-radar-demo", heading: "작전 과업 병목관리", action: "재계산" },
     { path: "/admin-doc-demo", heading: "행정문서 작성지원", action: "초안 작성" },
     { path: "/after-action-demo", heading: "사후조치 주간요약", action: "요약 생성" },
   ];
