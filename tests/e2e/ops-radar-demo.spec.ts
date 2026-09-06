@@ -15,6 +15,7 @@ test("runs the no-login Ops Radar sample flow and safely resets", async ({ page 
   await expect(page.getByText("운영 시스템 연동 전 시연판")).toBeVisible();
   const mobileGraphCards = page.locator('[data-testid^="ops-mobile-node-"]');
   await expect(mobileGraphCards).toHaveCount(7);
+  await expect(page.locator(".react-flow__node")).toHaveCount(0);
   const firstMobileCardBox = await mobileGraphCards.first().boundingBox();
   expect(firstMobileCardBox?.width).toBeGreaterThanOrEqual(300);
   expect(Number.parseFloat(await mobileGraphCards.first().evaluate((element) => getComputedStyle(element).fontSize))).toBeGreaterThanOrEqual(12);

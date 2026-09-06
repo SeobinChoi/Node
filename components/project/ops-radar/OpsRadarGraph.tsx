@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState, type KeyboardEvent } from "react";
+import { useCallback, useMemo, useState, useSyncExternalStore, type KeyboardEvent } from "react";
 import ReactFlow, { Background, Controls, Handle, MarkerType, Position, type Edge, type Node, type NodeProps } from "reactflow";
 import "reactflow/dist/style.css";
 import type { EvaluationResult, EvaluatedTask } from "@/lib/demo/ops-radar-types";
@@ -26,7 +26,17 @@ function TaskNode({ data }: NodeProps<{ task: EvaluatedTask; bottleneck: boolean
 }
 
 const nodeTypes = { task: TaskNode };
+const desktopGraphQuery = "(min-width: 640px)";
+const subscribeToDesktopGraph = (callback: () => void) => {
+  const query = window.matchMedia(desktopGraphQuery);
+  query.addEventListener("change", callback);
+  return () => query.removeEventListener("change", callback);
+};
+const getDesktopGraphSnapshot = () => window.matchMedia(desktopGraphQuery).matches;
+const getDesktopGraphServerSnapshot = () => false;
+
 export function OpsRadarGraph({ result, evaluated, onSelect }: { result: EvaluationResult; evaluated: boolean; onSelect: (id: string) => void }) {
+  const showDesktopGraph = useSyncExternalStore(subscribeToDesktopGraph, getDesktopGraphSnapshot, getDesktopGraphServerSnapshot);
   const [instance, setInstance] = useState<{ fitView: () => void } | null>(null);
   const bottleneckIds = useMemo(() => new Set(result.bottlenecks.map((reason) => reason.taskId)), [result.bottlenecks]);
   const taskTitles = useMemo(() => new Map(result.tasks.map((task) => [task.id, task.title])), [result.tasks]);
@@ -49,5 +59,5 @@ export function OpsRadarGraph({ result, evaluated, onSelect }: { result: Evaluat
         {evaluated && bottleneckIds.has(task.id) ? <span className="mt-1 inline-block rounded bg-red-700 px-1.5 py-0.5 text-[11px] font-bold text-white">핵심 병목</span> : null}
       </button>)}
     </div>
-    <div onKeyDown={handleKeyDown} className="pointer-events-none invisible absolute -left-[10000px] mt-3 h-[380px] w-[760px] overflow-hidden rounded border border-slate-100 sm:visible sm:static sm:block sm:w-auto sm:pointer-events-auto"><ReactFlow nodes={nodes} edges={edges} nodeTypes={nodeTypes} nodesDraggable={false} nodesConnectable={false} edgesFocusable={false} elementsSelectable onNodeClick={(_, node) => onSelect(node.id)} onInit={setInstance} fitView minZoom={0.4}><Background /><Controls showInteractive={false} /></ReactFlow></div></section>;
+    {showDesktopGraph ? <div onKeyDown={handleKeyDown} className="mt-3 h-[380px] overflow-hidden rounded border border-slate-100"><ReactFlow nodes={nodes} edges={edges} nodeTypes={nodeTypes} nodesDraggable={false} nodesConnectable={false} edgesFocusable={false} elementsSelectable onNodeClick={(_, node) => onSelect(node.id)} onInit={setInstance} fitView minZoom={0.4}><Background /><Controls showInteractive={false} /></ReactFlow></div> : null}</section>;
 }
