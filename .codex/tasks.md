@@ -122,4 +122,4 @@
 - [x] Whole-app UI 전면 개편: 브리핑|보드|목록 three switchable views (briefing default), rule-based briefing engine (`lib/briefing/derive-briefing.ts` + vitest 12/12), app-wide token migration (light sidebar via `--sidebar-*`, brand primaries, graph-colors centralized, MiniMap fix). Verified: tsc 0, eslint 0, e2e 10/10, browser-verified briefing headline/root-cause/deep-link on seeded board.
 - [ ] UI polish Phases 2–4 leftovers folded into the redesign; remaining deferred: dark-mode wiring, settings page 56-hex cleanup, public demo pages (deliberately untouched).
 - [ ] Save/keep .codex/context.md handoff current as work proceeds.
-- [ ] Build and deploy the public `/ops-radar-demo` workflow: deterministic task evaluation, dependency graph, before/after action, report export, mobile/browser QA.
+- [x] Build and deploy the public `/ops-radar-demo` workflow: deterministic task evaluation, dependency graph, before/after action, report export, mobile/browser QA.
