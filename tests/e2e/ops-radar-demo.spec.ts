@@ -137,6 +137,15 @@ test("keeps the desktop dependency graph readable and keyboard operable", async 
   await page.setViewportSize({ width: 639, height: 900 });
   await mobileVehicleNode.focus();
   await page.setViewportSize({ width: 640, height: 900 });
+  const checklistNode = page.getByTestId("rf__node-checklist");
+  await checklistNode.click();
+  await page.waitForTimeout(250);
+  await expect(checklistNode).toBeFocused();
+  await expect(vehicleNode).not.toBeFocused();
+
+  await page.setViewportSize({ width: 639, height: 900 });
+  await mobileVehicleNode.focus();
+  await page.setViewportSize({ width: 640, height: 900 });
   const fitButton = page.getByRole("button", { name: "전체 보기" });
   await fitButton.click();
   await page.waitForTimeout(250);

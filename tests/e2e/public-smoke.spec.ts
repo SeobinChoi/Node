@@ -59,3 +59,18 @@ test("public service demos load and respond to sample-data actions", async ({ pa
     );
   }
 });
+
+test("public demos do not initialize an authentication session", async ({ page }) => {
+  const authSessionRequests: string[] = [];
+  page.on("request", (request) => {
+    if (new URL(request.url()).pathname === "/api/auth/session") authSessionRequests.push(request.url());
+  });
+
+  for (const path of ["/ops-radar-demo", "/military-ai-demo", "/admin-doc-demo", "/after-action-demo", "/report-mock"]) {
+    const response = await page.goto(path);
+    expect(response?.ok()).toBe(true);
+    await page.waitForLoadState("networkidle");
+  }
+
+  expect(authSessionRequests).toEqual([]);
+});

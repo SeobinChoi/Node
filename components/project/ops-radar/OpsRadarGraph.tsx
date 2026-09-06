@@ -53,7 +53,8 @@ export function OpsRadarGraph({ result, evaluated, onSelect }: { result: Evaluat
       const target = event.target;
       if (!(target instanceof Element)) return;
       const taskControl = target.closest(".react-flow__node[data-id], [data-mobile-task-id]");
-      if (!taskControl || !sectionRef.current?.contains(taskControl)) {
+      const taskId = taskControl instanceof HTMLElement ? taskControl.dataset.id ?? taskControl.dataset.mobileTaskId : undefined;
+      if (!taskControl || !sectionRef.current?.contains(taskControl) || (pendingFocusTaskId.current && taskId !== pendingFocusTaskId.current)) {
         graphTaskHadFocus.current = false;
         pendingFocusTaskId.current = null;
       }
@@ -95,7 +96,10 @@ export function OpsRadarGraph({ result, evaluated, onSelect }: { result: Evaluat
     const target = event.target as HTMLElement;
     const taskId = target.closest<HTMLElement>(".react-flow__node[data-id]")?.dataset.id ?? target.closest<HTMLElement>("[data-mobile-task-id]")?.dataset.mobileTaskId;
     graphTaskHadFocus.current = Boolean(taskId);
-    if (taskId) lastFocusedTaskId.current = taskId;
+    if (taskId) {
+      if (pendingFocusTaskId.current && pendingFocusTaskId.current !== taskId) pendingFocusTaskId.current = null;
+      lastFocusedTaskId.current = taskId;
+    }
     else pendingFocusTaskId.current = null;
   }} onBlurCapture={(event) => {
     const next = event.relatedTarget;
