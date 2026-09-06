@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type KeyboardEvent } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type KeyboardEvent } from "react";
 import ReactFlow, { Background, Controls, Handle, MarkerType, Position, type Edge, type Node, type NodeProps } from "reactflow";
 import "reactflow/dist/style.css";
 import type { EvaluationResult, EvaluatedTask } from "@/lib/demo/ops-radar-types";
@@ -48,6 +48,16 @@ export function OpsRadarGraph({ result, evaluated, onSelect }: { result: Evaluat
     return () => query.removeEventListener("change", handleChange);
   }, []);
   const showDesktopGraph = useSyncExternalStore(subscribeToDesktopGraph, getDesktopGraphSnapshot, getDesktopGraphServerSnapshot);
+  useEffect(() => {
+    const clearGraphFocusOnOutsidePointer = (event: PointerEvent) => {
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+      const taskControl = target.closest(".react-flow__node[data-id], [data-mobile-task-id]");
+      if (!taskControl || !sectionRef.current?.contains(taskControl)) graphTaskHadFocus.current = false;
+    };
+    document.addEventListener("pointerdown", clearGraphFocusOnOutsidePointer, true);
+    return () => document.removeEventListener("pointerdown", clearGraphFocusOnOutsidePointer, true);
+  }, []);
   const [instance, setInstance] = useState<{ fitView: () => void } | null>(null);
   const bottleneckIds = useMemo(() => new Set(result.bottlenecks.map((reason) => reason.taskId)), [result.bottlenecks]);
   const taskTitles = useMemo(() => new Map(result.tasks.map((task) => [task.id, task.title])), [result.tasks]);

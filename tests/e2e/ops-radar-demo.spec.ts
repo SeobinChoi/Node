@@ -108,4 +108,15 @@ test("keeps the desktop dependency graph readable and keyboard operable", async 
   await expect(mobileVehicleNode).toBeFocused();
   await page.setViewportSize({ width: 640, height: 900 });
   await expect(vehicleNode).toBeFocused();
+
+  await page.locator("h1").first().click();
+  await expect.poll(() => page.evaluate(() => document.activeElement === document.body)).toBe(true);
+  await page.setViewportSize({ width: 639, height: 900 });
+  await expect(mobileVehicleNode).not.toBeFocused();
+
+  await mobileVehicleNode.focus();
+  await page.locator("h1").first().click();
+  await expect.poll(() => page.evaluate(() => document.activeElement === document.body)).toBe(true);
+  await page.setViewportSize({ width: 640, height: 900 });
+  await expect(vehicleNode).not.toBeFocused();
 });
