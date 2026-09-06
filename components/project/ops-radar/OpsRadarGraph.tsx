@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState, useSyncExternalStore, type KeyboardEvent } from "react";
+import { useCallback, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type KeyboardEvent } from "react";
 import ReactFlow, { Background, Controls, Handle, MarkerType, Position, type Edge, type Node, type NodeProps } from "reactflow";
 import "reactflow/dist/style.css";
 import type { EvaluationResult, EvaluatedTask } from "@/lib/demo/ops-radar-types";
@@ -27,15 +27,26 @@ function TaskNode({ data }: NodeProps<{ task: EvaluatedTask; bottleneck: boolean
 
 const nodeTypes = { task: TaskNode };
 const desktopGraphQuery = "(min-width: 640px)";
-const subscribeToDesktopGraph = (callback: () => void) => {
-  const query = window.matchMedia(desktopGraphQuery);
-  query.addEventListener("change", callback);
-  return () => query.removeEventListener("change", callback);
-};
 const getDesktopGraphSnapshot = () => window.matchMedia(desktopGraphQuery).matches;
 const getDesktopGraphServerSnapshot = () => false;
 
 export function OpsRadarGraph({ result, evaluated, onSelect }: { result: EvaluationResult; evaluated: boolean; onSelect: (id: string) => void }) {
+  const sectionRef = useRef<HTMLElement>(null);
+  const pendingFocusTaskId = useRef<string | null>(null);
+  const lastFocusedTaskId = useRef<string | null>(null);
+  const graphTaskHadFocus = useRef(false);
+  const subscribeToDesktopGraph = useCallback((callback: () => void) => {
+    const query = window.matchMedia(desktopGraphQuery);
+    const handleChange = () => {
+      const active = document.activeElement as HTMLElement | null;
+      const desktopTaskId = active?.closest<HTMLElement>(".react-flow__node[data-id]")?.dataset.id;
+      const mobileTaskId = active?.closest<HTMLElement>("[data-mobile-task-id]")?.dataset.mobileTaskId;
+      pendingFocusTaskId.current = desktopTaskId ?? mobileTaskId ?? (active === document.body && graphTaskHadFocus.current ? lastFocusedTaskId.current : null);
+      callback();
+    };
+    query.addEventListener("change", handleChange);
+    return () => query.removeEventListener("change", handleChange);
+  }, []);
   const showDesktopGraph = useSyncExternalStore(subscribeToDesktopGraph, getDesktopGraphSnapshot, getDesktopGraphServerSnapshot);
   const [instance, setInstance] = useState<{ fitView: () => void } | null>(null);
   const bottleneckIds = useMemo(() => new Set(result.bottlenecks.map((reason) => reason.taskId)), [result.bottlenecks]);
@@ -50,10 +61,34 @@ export function OpsRadarGraph({ result, evaluated, onSelect }: { result: Evaluat
     event.preventDefault();
     onSelect(node.dataset.id);
   };
-  return <section aria-labelledby="ops-graph-title" className="rounded-lg border border-slate-200 bg-white p-3"><div className="flex items-center justify-between gap-3"><div><h2 id="ops-graph-title" className="font-semibold text-slate-900">선후행 관계 그래프</h2><p className="text-xs text-slate-600">색상과 상태 텍스트로 진행 상황을 함께 표시합니다.</p></div><button type="button" onClick={fit} className="hidden rounded border border-slate-300 px-3 py-1.5 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-700 sm:inline-flex">전체 보기</button></div>
+  useLayoutEffect(() => {
+    const taskId = pendingFocusTaskId.current;
+    if (!taskId) return;
+    const selector = showDesktopGraph ? `.react-flow__node[data-id="${taskId}"]` : `[data-mobile-task-id="${taskId}"]`;
+    let remainingFrames = showDesktopGraph ? 12 : 1;
+    let frame = 0;
+    const focusReplacement = () => {
+      const replacement = sectionRef.current?.querySelector<HTMLElement>(selector);
+      if (replacement && document.activeElement !== replacement) replacement.focus();
+      remainingFrames -= 1;
+      if (remainingFrames > 0) frame = requestAnimationFrame(focusReplacement);
+      else pendingFocusTaskId.current = null;
+    };
+    focusReplacement();
+    return () => cancelAnimationFrame(frame);
+  }, [showDesktopGraph]);
+  return <section ref={sectionRef} aria-labelledby="ops-graph-title" onFocusCapture={(event) => {
+    const target = event.target as HTMLElement;
+    const taskId = target.closest<HTMLElement>(".react-flow__node[data-id]")?.dataset.id ?? target.closest<HTMLElement>("[data-mobile-task-id]")?.dataset.mobileTaskId;
+    graphTaskHadFocus.current = Boolean(taskId);
+    if (taskId) lastFocusedTaskId.current = taskId;
+  }} onBlurCapture={(event) => {
+    const next = event.relatedTarget;
+    if (next instanceof globalThis.Node && !sectionRef.current?.contains(next)) graphTaskHadFocus.current = false;
+  }} className="rounded-lg border border-slate-200 bg-white p-3"><div className="flex items-center justify-between gap-3"><div><h2 id="ops-graph-title" className="font-semibold text-slate-900">선후행 관계 그래프</h2><p className="text-xs text-slate-600">색상과 상태 텍스트로 진행 상황을 함께 표시합니다.</p></div><button type="button" onClick={fit} className="hidden rounded border border-slate-300 px-3 py-1.5 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-700 sm:inline-flex">전체 보기</button></div>
     <div data-testid="ops-mobile-graph" className="mt-3 space-y-2 sm:hidden">
       <p className="text-xs text-slate-600">모바일에서는 각 업무와 선행 업무를 읽기 쉬운 카드로 표시합니다.</p>
-      {result.tasks.map((task) => <button key={task.id} type="button" data-testid={`ops-mobile-node-${task.id}`} onClick={() => onSelect(task.id)} className={`w-full rounded-md border-2 p-3 text-left text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-700 ${taskTone(evaluated, task.status)}`}>
+      {result.tasks.map((task) => <button key={task.id} type="button" data-testid={`ops-mobile-node-${task.id}`} data-mobile-task-id={task.id} onClick={() => onSelect(task.id)} className={`w-full rounded-md border-2 p-3 text-left text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-700 ${taskTone(evaluated, task.status)}`}>
         <span className="flex items-start justify-between gap-2"><span className="font-semibold text-slate-900">{task.title}</span><span className="shrink-0 text-xs font-medium text-slate-700">{evaluated ? statusLabel[task.status] : "평가 전"}</span></span>
         <span className="mt-1 block text-xs leading-5 text-slate-600">선행 업무: {task.dependencies.length ? task.dependencies.map((id) => taskTitles.get(id)).join(", ") : "없음"}</span>
         {evaluated && bottleneckIds.has(task.id) ? <span className="mt-1 inline-block rounded bg-red-700 px-1.5 py-0.5 text-[11px] font-bold text-white">핵심 병목</span> : null}

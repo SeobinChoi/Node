@@ -15,7 +15,10 @@ test("runs the no-login Ops Radar sample flow and safely resets", async ({ page 
   await expect(page.getByText("운영 시스템 연동 전 시연판")).toBeVisible();
   const mobileGraphCards = page.locator('[data-testid^="ops-mobile-node-"]');
   await expect(mobileGraphCards).toHaveCount(7);
-  await expect(page.locator(".react-flow__node")).toHaveCount(0);
+  await expect(page.locator(".react-flow__node:visible")).toHaveCount(0);
+  await mobileGraphCards.last().focus();
+  await page.keyboard.press("Tab");
+  await expect(page.locator(".react-flow__node:focus")).toHaveCount(0);
   const firstMobileCardBox = await mobileGraphCards.first().boundingBox();
   expect(firstMobileCardBox?.width).toBeGreaterThanOrEqual(300);
   expect(Number.parseFloat(await mobileGraphCards.first().evaluate((element) => getComputedStyle(element).fontSize))).toBeGreaterThanOrEqual(12);
@@ -97,4 +100,12 @@ test("keeps the desktop dependency graph readable and keyboard operable", async 
   await page.keyboard.press("Space");
   await expect(page.getByTestId("ops-radar-detail")).toContainText("장비 점검 결과 확인");
   await expect(page.locator(".react-flow__edge[tabindex='0']")).toHaveCount(0);
+
+  await page.setViewportSize({ width: 640, height: 900 });
+  await vehicleNode.focus();
+  await page.setViewportSize({ width: 639, height: 900 });
+  const mobileVehicleNode = page.getByTestId("ops-mobile-node-vehicle");
+  await expect(mobileVehicleNode).toBeFocused();
+  await page.setViewportSize({ width: 640, height: 900 });
+  await expect(vehicleNode).toBeFocused();
 });
