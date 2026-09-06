@@ -53,7 +53,10 @@ export function OpsRadarGraph({ result, evaluated, onSelect }: { result: Evaluat
       const target = event.target;
       if (!(target instanceof Element)) return;
       const taskControl = target.closest(".react-flow__node[data-id], [data-mobile-task-id]");
-      if (!taskControl || !sectionRef.current?.contains(taskControl)) graphTaskHadFocus.current = false;
+      if (!taskControl || !sectionRef.current?.contains(taskControl)) {
+        graphTaskHadFocus.current = false;
+        pendingFocusTaskId.current = null;
+      }
     };
     document.addEventListener("pointerdown", clearGraphFocusOnOutsidePointer, true);
     return () => document.removeEventListener("pointerdown", clearGraphFocusOnOutsidePointer, true);
@@ -78,6 +81,7 @@ export function OpsRadarGraph({ result, evaluated, onSelect }: { result: Evaluat
     let remainingFrames = showDesktopGraph ? 12 : 1;
     let frame = 0;
     const focusReplacement = () => {
+      if (!graphTaskHadFocus.current || pendingFocusTaskId.current !== taskId) return;
       const replacement = sectionRef.current?.querySelector<HTMLElement>(selector);
       if (replacement && document.activeElement !== replacement) replacement.focus();
       remainingFrames -= 1;
@@ -92,9 +96,13 @@ export function OpsRadarGraph({ result, evaluated, onSelect }: { result: Evaluat
     const taskId = target.closest<HTMLElement>(".react-flow__node[data-id]")?.dataset.id ?? target.closest<HTMLElement>("[data-mobile-task-id]")?.dataset.mobileTaskId;
     graphTaskHadFocus.current = Boolean(taskId);
     if (taskId) lastFocusedTaskId.current = taskId;
+    else pendingFocusTaskId.current = null;
   }} onBlurCapture={(event) => {
     const next = event.relatedTarget;
-    if (next instanceof globalThis.Node && !sectionRef.current?.contains(next)) graphTaskHadFocus.current = false;
+    if (next instanceof globalThis.Node && !sectionRef.current?.contains(next)) {
+      graphTaskHadFocus.current = false;
+      pendingFocusTaskId.current = null;
+    }
   }} className="rounded-lg border border-slate-200 bg-white p-3"><div className="flex items-center justify-between gap-3"><div><h2 id="ops-graph-title" className="font-semibold text-slate-900">선후행 관계 그래프</h2><p className="text-xs text-slate-600">색상과 상태 텍스트로 진행 상황을 함께 표시합니다.</p></div><button type="button" onClick={fit} className="hidden rounded border border-slate-300 px-3 py-1.5 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-700 sm:inline-flex">전체 보기</button></div>
     <div data-testid="ops-mobile-graph" className="mt-3 space-y-2 sm:hidden">
       <p className="text-xs text-slate-600">모바일에서는 각 업무와 선행 업무를 읽기 쉬운 카드로 표시합니다.</p>

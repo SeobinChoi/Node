@@ -119,4 +119,26 @@ test("keeps the desktop dependency graph readable and keyboard operable", async 
   await expect.poll(() => page.evaluate(() => document.activeElement === document.body)).toBe(true);
   await page.setViewportSize({ width: 640, height: 900 });
   await expect(vehicleNode).not.toBeFocused();
+
+  await page.setViewportSize({ width: 639, height: 900 });
+  await mobileVehicleNode.focus();
+  await page.setViewportSize({ width: 640, height: 900 });
+  await page.locator("h1").first().click();
+  await page.waitForTimeout(250);
+  await expect(vehicleNode).not.toBeFocused();
+
+  await page.setViewportSize({ width: 639, height: 900 });
+  await mobileVehicleNode.focus();
+  await page.setViewportSize({ width: 640, height: 900 });
+  await page.keyboard.press("Tab");
+  await page.waitForTimeout(250);
+  await expect(vehicleNode).not.toBeFocused();
+
+  await page.setViewportSize({ width: 639, height: 900 });
+  await mobileVehicleNode.focus();
+  await page.setViewportSize({ width: 640, height: 900 });
+  const fitButton = page.getByRole("button", { name: "전체 보기" });
+  await fitButton.click();
+  await page.waitForTimeout(250);
+  await expect(fitButton).toBeFocused();
 });
