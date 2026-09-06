@@ -1,5 +1,7 @@
 # Log
 
+- 2026-09-06: Follow-up on delayed async review: replaced the 390px auto-fit React Flow canvas with readable full-width dependency cards while retaining the desktop graph, and added a focused/selectable manual report textarea when both Clipboard API and legacy copy are denied. Expanded Playwright coverage to mobile card geometry, denied-copy selection, and desktop graph keyboard activation (3/3). Also made the existing flat ESLint config reproducible by declaring its referenced plugins directly and ignoring generated `.vercel/**` output; full lint and production build pass.
+
 - 2026-09-06: Production deployment `dpl_rqDDUhmAKirAoxBPW7qk5QXc8Eiu` completed and aliased to `https://node-ruddy-tau.vercel.app/ops-radar-demo`. Verified Vercel status `Ready`, HTTP 200, full live 390px Playwright flow (1/1), zero page errors, zero `/api/*` requests, no horizontal page overflow, and desktop/mobile rendered layouts. Opened GitHub PR #13 from the Seobin-authored feature branch.
 
 - 2026-09-06: Added committed `vercel.json` build override (`prisma generate && next build`) after the default cloud build failed at `prisma migrate deploy` because the configured Supabase host was unreachable. Local `vercel build --prod` then completed in 14s. A prebuilt upload exposed a Vercel trace-packaging ENOENT for `@opentelemetry/api`; retained the reproducible cloud-build route instead of relying on prebuilt output.
