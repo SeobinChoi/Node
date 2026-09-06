@@ -6,14 +6,7 @@ import { useState } from "react";
 import { Toaster } from "@/components/ui/sonner";
 import { SessionProvider } from "next-auth/react";
 import { usePathname } from "next/navigation";
-
-const publicDemoRoutes = new Set([
-  "/ops-radar-demo",
-  "/military-ai-demo",
-  "/admin-doc-demo",
-  "/after-action-demo",
-  "/report-mock",
-]);
+import { publicDemoRoutes } from "@/lib/public-demo-routes";
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
