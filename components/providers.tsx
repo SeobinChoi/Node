@@ -6,6 +6,7 @@ import { useState } from "react";
 import { Toaster } from "@/components/ui/sonner";
 import { SessionProvider } from "next-auth/react";
 import { usePathname } from "next/navigation";
+import { publicDemoRoutes } from "@/lib/public-demo-routes";
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -30,8 +31,8 @@ export function Providers({ children }: { children: React.ReactNode }) {
     </QueryClientProvider>
   );
 
-  // This public, deterministic demo intentionally has no authentication or backend dependency.
-  if (pathname === "/ops-radar-demo") return content;
+  // Public demos intentionally avoid authentication session requests.
+  if (publicDemoRoutes.has(pathname)) return content;
 
   return <SessionProvider>{content}</SessionProvider>;
 }
