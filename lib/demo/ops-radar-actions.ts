@@ -49,7 +49,22 @@ export function buildOpsRadarActionQueue(result: EvaluationResult, limit = 4): O
   return [...bottlenecks, ...rest].slice(0, limit).map(toItem);
 }
 
-/** Dependency choices for the edited task: every other task in the current scenario. */
+/** Dependency choices that cannot create a cycle for the edited task. */
 export function dependencyOptions(tasks: DemoTask[], taskId: string): Array<{ id: string; title: string }> {
-  return tasks.filter((task) => task.id !== taskId).map((task) => ({ id: task.id, title: task.title }));
+  const byId = new Map(tasks.map((task) => [task.id, task]));
+  const dependsOn = (id: string, target: string, seen = new Set<string>()): boolean => {
+    if (id === target) return true;
+    if (seen.has(id)) return false;
+    seen.add(id);
+    return byId.get(id)?.dependencies.some((dependencyId) => dependsOn(dependencyId, target, seen)) ?? false;
+  };
+  return tasks
+    .filter((task) => task.id !== taskId && !dependsOn(task.id, taskId))
+    .map((task) => ({ id: task.id, title: task.title }));
+}
+
+export function removeOpsRadarTask(tasks: DemoTask[], taskId: string): DemoTask[] {
+  return tasks
+    .filter((task) => task.id !== taskId)
+    .map((task) => ({ ...task, dependencies: task.dependencies.filter((id) => id !== taskId) }));
 }

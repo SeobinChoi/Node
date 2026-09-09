@@ -46,6 +46,7 @@ interface DemoArtifactRow {
     title: string;
     summary: string;
     markdown: string;
+    sourceText?: string;
     createdAt: Date | string;
 }
 
@@ -55,6 +56,7 @@ export interface DemoArtifactSummary {
     title: string;
     summary: string;
     markdown: string;
+    sourceText?: string;
     createdAt: string;
 }
 
@@ -577,21 +579,40 @@ async function ensureDemoArtifactTable() {
 }
 
 export async function saveDemoArtifact({
+    artifactId,
     service,
     sourceText,
     result,
 }: {
+    artifactId?: string;
     service: PublicDemoService;
     sourceText: string;
-    result: PublicDemoResult;
+    result: Pick<PublicDemoResult, "title" | "summary" | "markdown">;
 }): Promise<DemoArtifactSummary> {
     await ensureDemoArtifactTable();
-    const id = randomUUID();
+    const id = artifactId ?? randomUUID();
     const resultJson = JSON.stringify(result);
 
     await prisma.$executeRaw`
         INSERT INTO public_demo_artifacts (id, service, title, summary, source_text, result_json, markdown)
         VALUES (${id}, ${service}, ${result.title}, ${result.summary}, ${sourceText}, CAST(${resultJson} AS jsonb), ${result.markdown})
+        ON CONFLICT (id) DO UPDATE SET
+            service = EXCLUDED.service,
+            title = EXCLUDED.title,
+            summary = EXCLUDED.summary,
+            source_text = EXCLUDED.source_text,
+            result_json = EXCLUDED.result_json,
+            markdown = EXCLUDED.markdown,
+            created_at = NOW()
+    `;
+    await prisma.$executeRaw`
+        DELETE FROM public_demo_artifacts
+        WHERE service = ${service} AND id NOT IN (
+            SELECT id FROM public_demo_artifacts
+            WHERE service = ${service}
+            ORDER BY created_at DESC
+            LIMIT 100
+        )
     `;
 
     return {
@@ -610,14 +631,14 @@ export async function listDemoArtifacts(service?: PublicDemoService, limit = 8):
     const blockedTitle = "AI response parsing failed";
     const rows = service
         ? await prisma.$queryRaw<DemoArtifactRow[]>`
-            SELECT id, service, title, summary, markdown, created_at AS "createdAt"
+            SELECT id, service, title, summary, markdown, source_text AS "sourceText", created_at AS "createdAt"
             FROM public_demo_artifacts
             WHERE service = ${service} AND title <> ${blockedTitle}
             ORDER BY created_at DESC
             LIMIT ${boundedLimit}
         `
         : await prisma.$queryRaw<DemoArtifactRow[]>`
-            SELECT id, service, title, summary, markdown, created_at AS "createdAt"
+            SELECT id, service, title, summary, markdown, source_text AS "sourceText", created_at AS "createdAt"
             FROM public_demo_artifacts
             WHERE title <> ${blockedTitle}
             ORDER BY created_at DESC
@@ -635,6 +656,7 @@ export async function listDemoArtifacts(service?: PublicDemoService, limit = 8):
             title: row.title,
             summary: row.summary,
             markdown: row.markdown,
+            ...(service === "opsRadar" && row.service === "opsRadar" ? { sourceText: row.sourceText } : {}),
             createdAt,
         };
     });
