@@ -23,11 +23,15 @@ export function OpsRadarTaskEditor({
   task,
   onSelect,
   onChange,
+  onAdd,
+  onDelete,
 }: {
   tasks: DemoTask[];
   task: DemoTask;
   onSelect: (taskId: string) => void;
   onChange: (taskId: string, patch: Partial<DemoTask>) => void;
+  onAdd: () => void;
+  onDelete: (taskId: string) => void;
 }) {
   const options = dependencyOptions(tasks, task.id);
   const toggleDependency = (dependencyId: string, checked: boolean) => {
@@ -48,6 +52,10 @@ export function OpsRadarTaskEditor({
         <select id="ops-edit-task" data-testid="ops-edit-task" className={fieldClass} value={task.id} onChange={(event) => onSelect(event.target.value)}>
           {tasks.map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}
         </select>
+        <div className="mt-2 flex gap-2">
+          <button type="button" data-testid="ops-add-task" onClick={onAdd} disabled={tasks.length >= 16} className="rounded border border-blue-700 px-3 py-1.5 text-sm text-blue-900 disabled:border-slate-300 disabled:text-slate-400">업무 추가</button>
+          <button type="button" data-testid="ops-delete-task" onClick={() => onDelete(task.id)} disabled={tasks.length <= 1} className="rounded border border-red-700 px-3 py-1.5 text-sm text-red-800 disabled:border-slate-300 disabled:text-slate-400">선택 업무 삭제</button>
+        </div>
       </div>
     </div>
 

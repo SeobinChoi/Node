@@ -3,13 +3,15 @@
 import { useMemo, useState } from "react";
 import { PublicDemoHeader } from "@/components/project/PublicDemoHeader";
 import { evaluateOpsRadar } from "@/lib/demo/evaluate-ops-radar";
-import { buildOpsRadarActionQueue } from "@/lib/demo/ops-radar-actions";
+import { buildOpsRadarActionQueue, removeOpsRadarTask } from "@/lib/demo/ops-radar-actions";
 import { DEFAULT_OPS_RADAR_SCENARIO_ID, OPS_RADAR_SCENARIOS, OPS_RADAR_TODAY, freshOpsRadarScenario, opsRadarScenarioById } from "@/lib/demo/ops-radar-scenario";
 import type { DemoTask } from "@/lib/demo/ops-radar-types";
+import type { OpsRadarSnapshot } from "@/lib/demo/ops-radar-snapshot";
 import { OpsRadarDetailPanel } from "./OpsRadarDetailPanel";
 import { OpsRadarGraph } from "./OpsRadarGraph";
 import { OpsRadarMetrics } from "./OpsRadarMetrics";
 import { OpsRadarReport } from "./OpsRadarReport";
+import { OpsRadarStorage } from "./OpsRadarStorage";
 import { OpsRadarTaskEditor } from "./OpsRadarTaskEditor";
 import { OpsRadarTaskTable } from "./OpsRadarTaskTable";
 
@@ -37,6 +39,18 @@ export function OpsRadarDemoClient() {
   const updateTask = (taskId: string, patch: Partial<DemoTask>) => {
     setTasks((current) => current.map((task) => task.id === taskId ? { ...task, ...patch } : task));
   };
+  const addTask = () => {
+    if (tasks.length >= 16) return;
+    const task: DemoTask = { id: `task-${crypto.randomUUID()}`, title: "신규 업무", owner: "미지정", dueDate: OPS_RADAR_TODAY, risk: "medium", state: "open", dependencies: [] };
+    setTasks((current) => [...current, task]);
+    setSelectedId(task.id);
+  };
+  const deleteTask = (taskId: string) => {
+    if (tasks.length <= 1) return;
+    const remaining = removeOpsRadarTask(tasks, taskId);
+    setTasks(remaining);
+    setSelectedId(remaining[0]?.id);
+  };
   const startScenario = (nextScenarioId: string) => {
     setScenarioId(nextScenarioId);
     setTasks(freshOpsRadarScenario(nextScenarioId));
@@ -45,6 +59,15 @@ export function OpsRadarDemoClient() {
     setSelectedId(undefined);
   };
   const reset = () => startScenario(scenarioId);
+  const loadSnapshot = (snapshot: OpsRadarSnapshot) => {
+    const loadedTasks = snapshot.tasks.map((task) => ({ ...task, dependencies: [...task.dependencies] }));
+    const loadedResult = evaluateOpsRadar({ tasks: loadedTasks, today: OPS_RADAR_TODAY });
+    setScenarioId(snapshot.scenarioId);
+    setTasks(loadedTasks);
+    setEvaluated(true);
+    setBaseline(loadedResult);
+    setSelectedId(loadedResult.bottlenecks[0]?.taskId ?? loadedTasks[0]?.id);
+  };
   const visibleResult = evaluated ? result : undefined;
   const leadAction = actionQueue[0];
   return <div lang="ko" className="min-h-screen overflow-x-hidden bg-slate-100 text-slate-900"><PublicDemoHeader variant="opsRadar" title="작전 과업 병목관리" />
@@ -68,10 +91,11 @@ export function OpsRadarDemoClient() {
           </div>
         </div>
       </section>
+      <OpsRadarStorage scenarioId={scenarioId} scenarioTitle={scenario.title} tasks={tasks} result={result} onLoad={loadSnapshot} />
       <section className="flex flex-wrap items-center justify-between gap-3"><div className="flex items-center gap-3"><span className={`rounded px-3 py-1.5 text-sm font-medium ${evaluated ? "bg-blue-100 text-blue-900" : "bg-slate-200 text-slate-700"}`}>{evaluated ? "평가 완료 · 규칙 기반 평가" : "평가 전"}</span><span className="text-xs text-slate-600">브라우저 내 시연 상태 · 새로고침하면 초기화</span></div><div className="flex gap-2"><button type="button" onClick={runEvaluation} className="rounded bg-blue-800 px-3 py-2 text-sm font-semibold text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-800">업무 평가 실행</button><button type="button" onClick={reset} className="rounded border border-slate-400 px-3 py-2 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-700">시연 초기화</button></div></section>
       <OpsRadarMetrics result={visibleResult} baseline={baseline} />
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]"><OpsRadarGraph result={result} evaluated={evaluated} onSelect={setSelectedId} /><OpsRadarDetailPanel evaluated={evaluated} task={selectedTask} reason={selectedReason} /></div>
-      {editingTask ? <OpsRadarTaskEditor tasks={tasks} task={editingTask} onSelect={setSelectedId} onChange={updateTask} /> : null}
+      {editingTask ? <OpsRadarTaskEditor tasks={tasks} task={editingTask} onSelect={setSelectedId} onChange={updateTask} onAdd={addTask} onDelete={deleteTask} /> : null}
       <section data-testid="ops-action-queue" aria-labelledby="ops-action-queue-title" className="rounded-lg border border-slate-200 bg-white p-4">
         <h2 id="ops-action-queue-title" className="font-semibold">현재 병목 조치</h2>
         <p className="mt-1 text-sm text-slate-600" data-testid="ops-action-lead">{!evaluated ? "업무 평가를 실행하면 현재 병목 순서로 조치 항목을 표시합니다." : leadAction ? `우선 조치: ${leadAction.title} · ${leadAction.reason}` : "즉시 조치가 필요한 업무가 없습니다."}</p>

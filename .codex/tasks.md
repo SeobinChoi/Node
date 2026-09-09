@@ -123,3 +123,4 @@
 - [ ] UI polish Phases 2–4 leftovers folded into the redesign; remaining deferred: dark-mode wiring, settings page 56-hex cleanup, public demo pages (deliberately untouched).
 - [ ] Save/keep .codex/context.md handoff current as work proceeds.
 - [x] Build and deploy the public `/ops-radar-demo` workflow: deterministic task evaluation, dependency graph, before/after action, report export, mobile/browser QA.
+- [x] Complete `/ops-radar-demo`: task add/delete with cycle prevention, shared DB save/reload, and direct validated HWPX download; verify unit, E2E, lint, typecheck, and production build.

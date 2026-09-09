@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { readFile } from "node:fs/promises";
 
 test("runs the no-login Ops Radar sample flow and safely resets", async ({ page }) => {
   const errors: string[] = [];
@@ -263,6 +264,8 @@ test("generates the selected report type from the current source and labels the 
   expect(payloads).toHaveLength(2);
   expect(payloads[1].sourceText).toContain("현장 대응반");
   expect(payloads[0].sourceText).not.toContain("현장 대응반");
+  await page.getByTestId("ops-document-type").selectOption("weekly");
+  await expect(page.getByTestId("ops-ai-title")).toHaveCount(0);
 });
 
 test("marks deterministic fallback output and surfaces generation failures", async ({ page }) => {
@@ -328,4 +331,47 @@ test("keeps the mobile relationship cards synchronized with scenarios and edits"
 
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   expect(await mobileCards.first().evaluate((element) => element.getBoundingClientRect().width <= window.innerWidth)).toBe(true);
+});
+
+test("adds, saves, reloads, and deletes an editable task without allowing cycles", async ({ page }) => {
+  let savedSource = "";
+  await page.route("**/api/demo/artifacts**", async (route) => {
+    if (route.request().method() === "POST") {
+      savedSource = route.request().postDataJSON().sourceText;
+      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ok: true, artifact: { id: "saved-1", createdAt: "2026-09-10T00:00:00.000Z" } }) });
+      return;
+    }
+    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ok: true, artifacts: [{ id: "saved-1", createdAt: "2026-09-10T00:00:00.000Z", sourceText: savedSource }] }) });
+  });
+
+  await page.goto("/ops-radar-demo");
+  await page.getByTestId("ops-add-task").click();
+  await page.getByTestId("ops-edit-title").fill("추가 정비 과업");
+  await expect(page.getByRole("button", { name: "추가 정비 과업", exact: true })).toBeVisible();
+  await page.getByTestId("ops-save-scenario").click();
+  await expect(page.getByTestId("ops-storage-status")).toContainText("DB에 저장");
+
+  await page.reload();
+  await page.getByTestId("ops-refresh-scenarios").click();
+  await expect(page.getByTestId("ops-storage-status")).toContainText("1개 저장본");
+  await page.getByTestId("ops-load-scenario").click();
+  await expect(page.getByRole("button", { name: "추가 정비 과업", exact: true })).toBeVisible();
+
+  await page.getByTestId("ops-edit-task").selectOption({ label: "추가 정비 과업" });
+  await page.getByTestId("ops-delete-task").click();
+  await expect(page.getByRole("button", { name: "추가 정비 과업", exact: true })).toHaveCount(0);
+  await page.getByTestId("ops-edit-task").selectOption("checklist");
+  await expect(page.getByTestId("ops-edit-dependency-approval")).toHaveCount(0);
+});
+
+test("downloads a real HWPX report", async ({ page }) => {
+  await page.goto("/ops-radar-demo");
+  await page.getByRole("button", { name: "업무 평가 실행" }).click();
+  const downloadPromise = page.waitForEvent("download");
+  await page.getByTestId("ops-hwpx-download").click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toBe("ops-radar-report.hwpx");
+  const path = await download.path();
+  expect(path).toBeTruthy();
+  expect(Array.from((await readFile(path!)).subarray(0, 4))).toEqual([0x50, 0x4b, 0x03, 0x04]);
 });

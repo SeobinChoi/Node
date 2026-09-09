@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { evaluateOpsRadar } from "@/lib/demo/evaluate-ops-radar";
 import { buildOpsRadarAiSource } from "@/lib/demo/export-ops-radar";
-import { buildOpsRadarActionQueue, dependencyOptions } from "@/lib/demo/ops-radar-actions";
+import { buildOpsRadarActionQueue, dependencyOptions, removeOpsRadarTask } from "@/lib/demo/ops-radar-actions";
 import { OPS_RADAR_SCENARIOS, freshOpsRadarScenario } from "@/lib/demo/ops-radar-scenario";
+import { parseOpsRadarSnapshot, serializeOpsRadarSnapshot } from "@/lib/demo/ops-radar-snapshot";
 
 describe("interactive Ops Radar", () => {
   it("ships four materially different editable scenarios", () => {
@@ -46,7 +47,43 @@ describe("interactive Ops Radar", () => {
     const options = dependencyOptions(tasks, "patrol");
 
     expect(options.some((option) => option.id === "patrol")).toBe(false);
-    expect(options.map((option) => option.id)).toEqual(tasks.filter((task) => task.id !== "patrol").map((task) => task.id));
+    expect(options.map((option) => option.id)).toEqual(["forecast", "drainage", "sandbag", "evacuation"]);
     expect(dependencyOptions(tasks, "unknown-task")).toHaveLength(tasks.length);
+  });
+
+  it("prevents dependency cycles and removes deleted task references", () => {
+    const tasks = freshOpsRadarScenario("night-comms");
+
+    expect(dependencyOptions(tasks, "checklist").map((option) => option.id)).not.toContain("approval");
+    expect(dependencyOptions(tasks, "checklist").map((option) => option.id)).toContain("vehicle");
+
+    const remaining = removeOpsRadarTask(tasks, "checklist");
+    expect(remaining.some((task) => task.id === "checklist")).toBe(false);
+    expect(remaining.every((task) => !task.dependencies.includes("checklist"))).toBe(true);
+  });
+
+  it("round-trips valid saved scenarios and rejects broken relationships", () => {
+    const tasks = freshOpsRadarScenario("equipment-return");
+    const saved = serializeOpsRadarSnapshot({ scenarioId: "equipment-return", scenarioTitle: "장비 반납 정비", tasks });
+    expect(parseOpsRadarSnapshot(saved)).toEqual({ scenarioId: "equipment-return", scenarioTitle: "장비 반납 정비", tasks });
+
+    expect(() => parseOpsRadarSnapshot(JSON.stringify({
+      scenarioId: "bad",
+      scenarioTitle: "잘못된 저장본",
+      tasks: [{ ...tasks[0], dependencies: ["missing"] }],
+    }))).toThrow();
+    expect(() => parseOpsRadarSnapshot(JSON.stringify({
+      scenarioId: "equipment-return",
+      scenarioTitle: "잘못된 날짜",
+      tasks: [{ ...tasks[0], dueDate: "2026-99-99", dependencies: [] }],
+    }))).toThrow();
+    expect(() => parseOpsRadarSnapshot(JSON.stringify({
+      scenarioId: "equipment-return",
+      scenarioTitle: "중복 관계",
+      tasks: [
+        { ...tasks[0], dependencies: [tasks[1].id, tasks[1].id] },
+        { ...tasks[1], dependencies: [] },
+      ],
+    }))).toThrow();
   });
 });

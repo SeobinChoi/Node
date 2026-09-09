@@ -46,6 +46,7 @@ interface DemoArtifactRow {
     title: string;
     summary: string;
     markdown: string;
+    sourceText?: string;
     createdAt: Date | string;
 }
 
@@ -55,6 +56,7 @@ export interface DemoArtifactSummary {
     title: string;
     summary: string;
     markdown: string;
+    sourceText?: string;
     createdAt: string;
 }
 
@@ -583,7 +585,7 @@ export async function saveDemoArtifact({
 }: {
     service: PublicDemoService;
     sourceText: string;
-    result: PublicDemoResult;
+    result: Pick<PublicDemoResult, "title" | "summary" | "markdown">;
 }): Promise<DemoArtifactSummary> {
     await ensureDemoArtifactTable();
     const id = randomUUID();
@@ -610,14 +612,14 @@ export async function listDemoArtifacts(service?: PublicDemoService, limit = 8):
     const blockedTitle = "AI response parsing failed";
     const rows = service
         ? await prisma.$queryRaw<DemoArtifactRow[]>`
-            SELECT id, service, title, summary, markdown, created_at AS "createdAt"
+            SELECT id, service, title, summary, markdown, source_text AS "sourceText", created_at AS "createdAt"
             FROM public_demo_artifacts
             WHERE service = ${service} AND title <> ${blockedTitle}
             ORDER BY created_at DESC
             LIMIT ${boundedLimit}
         `
         : await prisma.$queryRaw<DemoArtifactRow[]>`
-            SELECT id, service, title, summary, markdown, created_at AS "createdAt"
+            SELECT id, service, title, summary, markdown, source_text AS "sourceText", created_at AS "createdAt"
             FROM public_demo_artifacts
             WHERE title <> ${blockedTitle}
             ORDER BY created_at DESC
@@ -635,6 +637,7 @@ export async function listDemoArtifacts(service?: PublicDemoService, limit = 8):
             title: row.title,
             summary: row.summary,
             markdown: row.markdown,
+            ...(row.service === "opsRadar" ? { sourceText: row.sourceText } : {}),
             createdAt,
         };
     });
