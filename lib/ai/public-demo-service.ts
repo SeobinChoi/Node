@@ -637,7 +637,7 @@ export async function listDemoArtifacts(service?: PublicDemoService, limit = 8):
             title: row.title,
             summary: row.summary,
             markdown: row.markdown,
-            ...(row.service === "opsRadar" ? { sourceText: row.sourceText } : {}),
+            ...(service === "opsRadar" && row.service === "opsRadar" ? { sourceText: row.sourceText } : {}),
             createdAt,
         };
     });
