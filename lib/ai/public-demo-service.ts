@@ -126,6 +126,13 @@ const RESPONSE_SHAPES = {
   "sections": [{"heading": "보고 항목", "body": "본문"}],
   "reviewChecklist": ["수치/보안/일정 확인 항목"]
 }`,
+    opsRadarReport: `{
+  "title": "보고서 제목",
+  "summary": "현재 상황과 핵심 병목 요약",
+  "sections": [{"heading": "항목명", "body": "항목별 본문"}],
+  "actionItems": [{"task": "조치", "owner": "담당 부서", "dueDate": "기한 또는 [미정]"}],
+  "reviewChecklist": ["보고 전 확인 항목"]
+}`,
     securityScan: `{
   "title": "보안 검토 요약",
   "summary": "제출 가능성 요약",
@@ -147,6 +154,8 @@ const SYSTEM_PROMPTS = {
         "You prepare Korean weekly situation reports for a public no-login demo. Convert raw updates into completed/in-progress/risk/next-week sections and return JSON.",
     securityScan:
         "You are a conservative Korean military document security reviewer for a public no-login demo. Recommend generalized replacements without revealing sensitive values.",
+    opsRadarReport:
+        "You write Korean unit operations reports for a public no-login demo. The input is a synthetic task dependency graph with computed statuses and bottlenecks; keep every task title, owner and date exactly as given, never invent facts, and return review-ready JSON.",
 };
 
 const TOOL_INSTRUCTIONS = {
@@ -155,7 +164,17 @@ const TOOL_INSTRUCTIONS = {
     aarSummary: "Create a meeting or training after-action review summary from notes and observations.",
     weeklyReport: "Create a weekly situation report from project and unit notes.",
     securityScan: "Review this text for public demo submission safety and provide a safer rewrite.",
+    opsRadarReport: "Turn the evaluated task graph into a Korean operations report.",
 };
+
+const OPS_RADAR_DOCUMENT_INSTRUCTIONS: Record<string, string> = {
+    command: "보고서 유형은 지휘관 상황보고입니다. 현재 상황, 핵심 병목과 영향, 지휘 판단이 필요한 사항 순으로 작성하세요.",
+    action: "보고서 유형은 병목 조치계획입니다. 병목별 원인, 담당 부서, 기한, 조치 방법을 중심으로 작성하세요.",
+    weekly: "보고서 유형은 주간 진행보고입니다. 완료 사항, 진행 사항, 위험 요인, 차주 계획 순으로 작성하세요.",
+};
+
+const opsRadarInstruction = (mode: string) =>
+    `${TOOL_INSTRUCTIONS.opsRadarReport} ${OPS_RADAR_DOCUMENT_INSTRUCTIONS[mode] ?? OPS_RADAR_DOCUMENT_INSTRUCTIONS.command}`;
 
 const ACTION_KEYS = [
     "actions",
@@ -269,8 +288,16 @@ function sourceExcerpt(sourceText: string): string {
     return normalized.length > 90 ? `${normalized.slice(0, 90)}...` : normalized;
 }
 
-function isParseFallback(generated: Record<string, unknown>): boolean {
-    return textValue(generated.title) === "AI response parsing failed";
+function needsDeterministicFallback(
+    generated: Record<string, unknown>,
+    service: PublicDemoService,
+    tool: keyof typeof RESPONSE_SHAPES,
+): boolean {
+    if (textValue(generated.title) === "AI response parsing failed") return true;
+    if (service !== "opsRadar" || tool !== "opsRadarReport") return false;
+    return !textValue(generated.title) || !textValue(generated.summary)
+        || arrayValues(generated.sections).length === 0
+        || arrayValues(generated.actionItems).length === 0;
 }
 
 function fallbackGeneratedForService({
@@ -301,6 +328,30 @@ function fallbackGeneratedForService({
                 { task: "사후조치 결과 주간보고 반영", owner: "보고 담당", dueDate: "[미정]" },
             ],
             reviewChecklist: ["실제 훈련명 비식별 확인", "담당 부서 표기 확인", "일정 확정값 확인"],
+        };
+    }
+
+    if (tool === "opsRadarReport") {
+        const documentLabel = mode === "weekly" ? "주간 진행보고" : mode === "action" ? "병목 조치계획" : "지휘관 상황보고";
+        const lines = sourceText.split("\n");
+        const line = (prefix: string) => lines.find((item) => item.startsWith(prefix))?.replace(/^metrics:\s*|^-\s*/, "");
+        const after = (heading: string) => {
+            const index = lines.indexOf(heading);
+            return index >= 0 ? lines[index + 1]?.replace(/^-\s*/, "") : undefined;
+        };
+        const metrics = line("metrics:") ?? "평가 지표 없음";
+        const bottleneck = after(lines.find((item) => item.startsWith("bottlenecks (")) ?? "") ?? "즉시 조치가 필요한 병목 없음";
+        const recommendation = after("recommendations:") ?? "현재 업무 상태를 유지하며 재평가";
+        return {
+            title: `${documentLabel} 초안`,
+            summary: `평가된 현재 과업 관계를 기준으로 정리했습니다. ${metrics}.`,
+            sections: [
+                { heading: "현재 상황", body: metrics },
+                { heading: "핵심 병목", body: bottleneck },
+                { heading: "우선 조치", body: recommendation },
+            ],
+            actionItems: [recommendation],
+            reviewChecklist: ["실제 부대명 제거", "담당 부서 표기 확인", "기한 확정값 확인"],
         };
     }
 
@@ -387,52 +438,6 @@ ${security}
 `;
 }
 
-function opsRadarResult(sourceText: string, mode: string): PublicDemoResult {
-    const highSignals = ["지연", "미확정", "위험", "대기", "승인"].filter((word) => sourceText.includes(word)).length;
-    const sourceLengthScore = Math.min(9, Math.max(3, Math.ceil(sourceText.trim().length / 45)));
-    const highRisk = Math.max(1, highSignals);
-    const delayed = Math.max(2, sourceLengthScore - 1);
-    const reportable = Math.max(6, 14 - delayed);
-    const modeLabel = mode === "owner" ? "담당 기준" : mode === "timeline" ? "일정 기준" : "위험도 기준";
-    const actions = [
-        `${modeLabel}으로 고위험 과업 ${highRisk}건을 우선 확인`,
-        "장비 점검표와 안전 통제 인원 배치를 선행조건으로 고정",
-        "주간보고 전 미확정 항목을 별도 추적 목록으로 저장",
-    ];
-    const partial: Omit<PublicDemoResult, "markdown"> = {
-        title: "병목 재계산 결과",
-        summary: `${modeLabel} 분석 결과, 지연 신호 ${delayed}건과 고위험 과업 ${highRisk}건을 분리했다. 입력 메모는 공개 시연용 더미 데이터로 처리했다.`,
-        sections: [
-            {
-                label: "우선 조치",
-                body: "점검표 취합, 통제 인원 확정, 대체 일정 검토를 같은 마감선에 묶어 병목을 줄인다.",
-            },
-            {
-                label: "노드 연결",
-                body: "지연 원인 노드는 주간상황보고와 안전 통제 노드의 선행조건으로 연결한다.",
-            },
-        ],
-        actions,
-        security: [
-            { label: "공개 시연", status: "pass", note: "실제 부대명, 좌표, 담당자명 없이 처리" },
-            { label: "입력 검토", status: highSignals > 2 ? "review" : "pass", note: "실제 제출 전 민감표현 재확인" },
-        ],
-        metrics: [
-            { label: "고위험", value: String(highRisk), note: "우선 조치" },
-            { label: "지연과업", value: String(delayed), note: "담당 확인" },
-            { label: "보고가능", value: String(reportable), note: "현황 유지" },
-        ],
-        workItems: workItemsFromActions(actions, "opsRadar"),
-        model: "deterministic-demo-engine",
-        generatedKeys: ["title", "summary", "sections", "actions", "metrics", "workItems"],
-        securityFlagCount: scanMilitarySensitiveContent([sourceText]).length,
-    };
-
-    return {
-        ...partial,
-        markdown: markdownFromResult("opsRadar", partial),
-    };
-}
 
 function resolveTool(service: PublicDemoService, tool: string, mode: string): keyof typeof RESPONSE_SHAPES {
     if (service === "militaryAi") {
@@ -442,6 +447,10 @@ function resolveTool(service: PublicDemoService, tool: string, mode: string): ke
 
     if (service === "adminDoc") {
         return mode === "security" ? "securityScan" : "adminDocument";
+    }
+
+    if (service === "opsRadar") {
+        return "opsRadarReport";
     }
 
     if (service === "afterAction") {
@@ -464,10 +473,6 @@ export async function generatePublicDemoResult({
     mode?: string;
     sourceText: string;
 }): Promise<PublicDemoResult> {
-    if (service === "opsRadar") {
-        return opsRadarResult(sourceText, mode);
-    }
-
     const resolvedTool = resolveTool(service, tool, mode);
     let generated: MilitaryAIResult;
     try {
@@ -475,7 +480,7 @@ export async function generatePublicDemoResult({
             projectName: DEMO_PROJECT_NAME,
             sourceText,
             systemPrompt: SYSTEM_PROMPTS[resolvedTool],
-            userInstruction: TOOL_INSTRUCTIONS[resolvedTool],
+            userInstruction: resolvedTool === "opsRadarReport" ? opsRadarInstruction(mode) : TOOL_INSTRUCTIONS[resolvedTool],
             responseShape: RESPONSE_SHAPES[resolvedTool],
             metadata: {
                 publicDemo: true,
@@ -501,7 +506,7 @@ export async function generatePublicDemoResult({
     }
     let effectiveGenerated = generated.generated;
 
-    if (isParseFallback(effectiveGenerated)) {
+    if (needsDeterministicFallback(effectiveGenerated, service, resolvedTool)) {
         effectiveGenerated = fallbackGeneratedForService({
             service,
             tool: resolvedTool,
@@ -511,6 +516,7 @@ export async function generatePublicDemoResult({
         generated = {
             ...generated,
             generated: effectiveGenerated,
+            model: "deterministic-demo-fallback",
         };
     }
 
