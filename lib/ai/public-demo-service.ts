@@ -579,21 +579,40 @@ async function ensureDemoArtifactTable() {
 }
 
 export async function saveDemoArtifact({
+    artifactId,
     service,
     sourceText,
     result,
 }: {
+    artifactId?: string;
     service: PublicDemoService;
     sourceText: string;
     result: Pick<PublicDemoResult, "title" | "summary" | "markdown">;
 }): Promise<DemoArtifactSummary> {
     await ensureDemoArtifactTable();
-    const id = randomUUID();
+    const id = artifactId ?? randomUUID();
     const resultJson = JSON.stringify(result);
 
     await prisma.$executeRaw`
         INSERT INTO public_demo_artifacts (id, service, title, summary, source_text, result_json, markdown)
         VALUES (${id}, ${service}, ${result.title}, ${result.summary}, ${sourceText}, CAST(${resultJson} AS jsonb), ${result.markdown})
+        ON CONFLICT (id) DO UPDATE SET
+            service = EXCLUDED.service,
+            title = EXCLUDED.title,
+            summary = EXCLUDED.summary,
+            source_text = EXCLUDED.source_text,
+            result_json = EXCLUDED.result_json,
+            markdown = EXCLUDED.markdown,
+            created_at = NOW()
+    `;
+    await prisma.$executeRaw`
+        DELETE FROM public_demo_artifacts
+        WHERE service = ${service} AND id NOT IN (
+            SELECT id FROM public_demo_artifacts
+            WHERE service = ${service}
+            ORDER BY created_at DESC
+            LIMIT 100
+        )
     `;
 
     return {

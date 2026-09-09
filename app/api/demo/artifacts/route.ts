@@ -58,8 +58,9 @@ export async function POST(req: NextRequest) {
         }
         const body = SaveSchema.parse(await req.json());
         const service = normalizeDemoService(body.service);
-        if (service === "opsRadar") parseOpsRadarSnapshot(body.sourceText);
+        const snapshot = service === "opsRadar" ? parseOpsRadarSnapshot(body.sourceText) : undefined;
         const artifact = await saveDemoArtifact({
+            artifactId: snapshot ? `ops-radar-${snapshot.scenarioId}` : undefined,
             service,
             sourceText: body.sourceText,
             result: body.result,

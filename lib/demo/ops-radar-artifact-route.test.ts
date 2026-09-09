@@ -36,7 +36,7 @@ describe("Ops Radar artifact route validation", () => {
     const sourceText = serializeOpsRadarSnapshot({ scenarioId: "night-comms", scenarioTitle: scenario.title, tasks: scenario.tasks });
     const response = await POST(request({ service: "opsRadar", sourceText, result: { ...result, oversized: "discard" } }, "artifact-valid"));
     expect(response.status).toBe(200);
-    expect(saveDemoArtifact).toHaveBeenCalledWith({ service: "opsRadar", sourceText, result });
+    expect(saveDemoArtifact).toHaveBeenCalledWith({ artifactId: "ops-radar-night-comms", service: "opsRadar", sourceText, result });
   });
 
   it("rate-limits anonymous writes", async () => {
