@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertTriangle,
   CheckCircle2,
@@ -17,6 +17,8 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { PublicDemoHeader } from "@/components/project/PublicDemoHeader";
+import { AiTypewriter } from "@/components/project/AiTypewriter";
+import { examplesForTool } from "@/lib/demo/public-document-examples";
 
 type DemoToolId =
   | "adminDocument"
@@ -31,6 +33,8 @@ interface DemoTool {
   shortLabel: string;
   icon: LucideIcon;
   accent: string;
+  ctaLabel: string;
+  description: string;
 }
 
 interface DemoOutput {
@@ -79,6 +83,8 @@ const tools: DemoTool[] = [
     shortLabel: "문서",
     icon: FileText,
     accent: "border-cyan-300 bg-cyan-50 text-cyan-800",
+    ctaLabel: "문서 초안 작성",
+    description: "부서별 준비 상황과 조정이 필요한 사항을 정리해 행정문서 초안을 만듭니다.",
   },
   {
     id: "meetingSummary",
@@ -86,6 +92,8 @@ const tools: DemoTool[] = [
     shortLabel: "회의",
     icon: ClipboardList,
     accent: "border-indigo-300 bg-indigo-50 text-indigo-800",
+    ctaLabel: "회의록 요약",
+    description: "회의에서 나온 결정사항과 아직 정리되지 않은 미결 안건을 구분해 정리합니다.",
   },
   {
     id: "aarSummary",
@@ -93,6 +101,8 @@ const tools: DemoTool[] = [
     shortLabel: "AAR",
     icon: ClipboardCheck,
     accent: "border-emerald-300 bg-emerald-50 text-emerald-800",
+    ctaLabel: "AAR 작성",
+    description: "훈련에서 유지할 점과 개선할 점을 나눠 사후검토(AAR) 결과를 작성합니다.",
   },
   {
     id: "weeklyReport",
@@ -100,6 +110,8 @@ const tools: DemoTool[] = [
     shortLabel: "주간",
     icon: ListChecks,
     accent: "border-amber-300 bg-amber-50 text-amber-800",
+    ctaLabel: "주간보고 작성",
+    description: "이번 주 완료·진행 현황과 위험 요인을 정리해 주간상황보고를 작성합니다.",
   },
   {
     id: "securityScan",
@@ -107,11 +119,13 @@ const tools: DemoTool[] = [
     shortLabel: "보안",
     icon: ShieldCheck,
     accent: "border-rose-300 bg-rose-50 text-rose-800",
+    ctaLabel: "보안 검토",
+    description: "제출 전 실명·군번·좌표 등 민감정보를 탐지하고 마스킹 권고안을 제시합니다.",
   },
 ];
 
-const defaultSource =
-  "7월 합동 점검 준비 회의. 장비 점검표 2건 미제출, 야간 통신 점검 일정 조정 필요. 군수반은 예비 배터리 현황을 금요일까지 공유하고, 작전계획반은 우천 시 대체 일정을 정리한다.";
+const defaultExample = examplesForTool("adminDocument")[0];
+const defaultSource = defaultExample.sourceText;
 
 const baseNodes: SavedNode[] = [
   {
@@ -250,6 +264,11 @@ const templates: Record<DemoToolId, Omit<DemoOutput, "summary">> = {
   },
 };
 
+function generationLabel(model: string) {
+  if (/fallback/i.test(model)) return "샘플 fallback";
+  return /^gemini(?:-|$)/i.test(model) ? "Gemini 생성" : `AI 생성 · ${model}`;
+}
+
 function makeOutput(toolId: DemoToolId, sourceText: string): DemoOutput {
   const template = templates[toolId];
   const normalized = sourceText.trim().replace(/\s+/g, " ");
@@ -308,6 +327,31 @@ function outputFromPayload(payload: DemoResultPayload): DemoOutput {
   };
 }
 
+function outputTextSegments(output: DemoOutput, toolId: DemoToolId): string[] {
+  return [
+    output.title,
+    output.summary,
+    ...output.sections.flatMap((section) => [section.label, section.body]),
+    ...output.actions,
+    ...(toolId === "adminDocument" || toolId === "securityScan"
+      ? output.security.flatMap((item) => [item.label, item.note])
+      : []),
+  ];
+}
+
+function outputWithSegments(output: DemoOutput, segments: string[], toolId: DemoToolId): DemoOutput {
+  let index = 0;
+  return {
+    title: segments[index++],
+    summary: segments[index++],
+    sections: output.sections.map(() => ({ label: segments[index++], body: segments[index++] })),
+    actions: output.actions.map(() => segments[index++]),
+    security: toolId === "adminDocument" || toolId === "securityScan"
+      ? output.security.map((item) => ({ ...item, label: segments[index++], note: segments[index++] }))
+      : output.security,
+  };
+}
+
 function nodeFromArtifact(artifact: SavedDemoArtifact): SavedNode {
   return {
     id: `DEMO-${artifact.id.slice(0, 8).toUpperCase()}`,
@@ -332,8 +376,100 @@ function StatusBadge({
   );
 }
 
+function ActionChecklist({ title, actions }: { title: string; actions: string[] }) {
+  return (
+    <div className="rounded-lg border border-slate-200 p-4">
+      <h3 className="text-sm font-semibold">{title}</h3>
+      <div className="mt-3 space-y-2">
+        {actions.map((action, index) => (
+          <div key={index} className="flex gap-2 text-sm text-slate-700">
+            <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
+            <span className="leading-5">{action}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function SecurityList({ title, items }: { title: string; items: DemoOutput["security"] }) {
+  return (
+    <div className="rounded-lg border border-slate-200 p-4">
+      <h3 className="text-sm font-semibold">{title}</h3>
+      <div className="mt-3 space-y-2">
+        {items.map((item, index) => (
+          <div key={index} className="flex items-start gap-2 text-sm">
+            {item.status === "pass" ? (
+              <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
+            ) : (
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+            )}
+            <div>
+              <p className="font-medium text-slate-800">{item.label}</p>
+              <p className="mt-1 text-xs leading-5 text-slate-500">{item.note}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ResultBody({ toolId, output }: { toolId: DemoToolId; output: DemoOutput }) {
+  const sectionTone = (label: string) => {
+    if (toolId === "meetingSummary") {
+      if (label.includes("결정")) return "border-indigo-200 bg-indigo-50 text-indigo-900";
+      if (label.includes("미결")) return "border-amber-200 bg-amber-50 text-amber-900";
+    }
+    if (toolId === "aarSummary") {
+      if (label.includes("유지")) return "border-emerald-200 bg-emerald-50 text-emerald-900";
+      if (label.includes("개선") || label.includes("원인")) return "border-amber-200 bg-amber-50 text-amber-900";
+    }
+    if (toolId === "weeklyReport") {
+      if (label.includes("완료")) return "border-emerald-200 bg-emerald-50 text-emerald-900";
+      if (label.includes("위험")) return "border-amber-200 bg-amber-50 text-amber-900";
+      if (label.includes("차주")) return "border-blue-200 bg-blue-50 text-blue-900";
+    }
+    if (toolId === "securityScan") {
+      if (label.includes("위험") || label.includes("탐지")) return "border-rose-200 bg-rose-50 text-rose-900";
+      if (label.includes("재작성") || label.includes("대체")) return "border-emerald-200 bg-emerald-50 text-emerald-900";
+    }
+    return "border-slate-200 bg-white text-slate-900";
+  };
+  const actionTitle = toolId === "meetingSummary"
+    ? "액션 아이템"
+    : toolId === "aarSummary"
+      ? "다음 훈련 반영"
+      : toolId === "weeklyReport"
+        ? "차주 실행계획"
+        : toolId === "securityScan"
+          ? "마스킹 체크리스트"
+          : "후속조치";
+  const sectionGrid = toolId === "weeklyReport" ? "sm:grid-cols-2" : "lg:grid-cols-2";
+
+  return (
+    <>
+      <div className={`mt-4 grid gap-3 ${sectionGrid}`}>
+        {output.sections.map((section, index) => (
+          <article key={index} className={`rounded-lg border p-4 ${sectionTone(section.label)}`}>
+            <h3 className="text-sm font-semibold">{section.label}</h3>
+            <p className="mt-2 text-sm leading-6 opacity-80">{section.body}</p>
+          </article>
+        ))}
+      </div>
+      <div className={`mt-4 grid gap-4 ${toolId === "adminDocument" || toolId === "securityScan" ? "lg:grid-cols-[1fr_0.8fr]" : ""}`}>
+        <ActionChecklist title={actionTitle} actions={output.actions} />
+        {toolId === "adminDocument" || toolId === "securityScan" ? (
+          <SecurityList title={toolId === "securityScan" ? "자동 탐지" : "보안 검토"} items={output.security} />
+        ) : null}
+      </div>
+    </>
+  );
+}
+
 export function MilitaryAIDemoClient() {
   const [activeToolId, setActiveToolId] = useState<DemoToolId>("adminDocument");
+  const [selectedExampleId, setSelectedExampleId] = useState(defaultExample.id);
   const [sourceText, setSourceText] = useState(defaultSource);
   const [output, setOutput] = useState<DemoOutput>(() =>
     makeOutput("adminDocument", defaultSource)
@@ -349,11 +485,14 @@ export function MilitaryAIDemoClient() {
   const [copied, setCopied] = useState(false);
   const [pendingAction, setPendingAction] = useState("");
   const [error, setError] = useState("");
+  const [hasResult, setHasResult] = useState(false);
+  const requestVersion = useRef(0);
 
   const activeTool = useMemo(
     () => tools.find((tool) => tool.id === activeToolId) ?? tools[0],
     [activeToolId]
   );
+  const activeExamples = useMemo(() => examplesForTool(activeToolId), [activeToolId]);
   const ActiveIcon = activeTool.icon;
   const selectedNode = savedNodes.find((node) => node.id === selectedNodeId) ?? savedNodes[0];
 
@@ -380,11 +519,42 @@ export function MilitaryAIDemoClient() {
     };
   }, []);
 
+  const clearResult = () => {
+    requestVersion.current += 1;
+    setHasResult(false);
+    setCopied(false);
+    setError("");
+  };
+
+  const selectTool = (toolId: DemoToolId) => {
+    if (toolId === activeToolId) return;
+    const example = examplesForTool(toolId)[0];
+    clearResult();
+    setActiveToolId(toolId);
+    setSelectedExampleId(example.id);
+    setSourceText(example.sourceText);
+  };
+
+  const selectExample = (exampleId: string) => {
+    const example = activeExamples.find((item) => item.id === exampleId);
+    if (!example) return;
+    clearResult();
+    setSelectedExampleId(example.id);
+    setSourceText(example.sourceText);
+  };
+
+  const editSource = (value: string) => {
+    clearResult();
+    setSourceText(value);
+  };
+
   const generate = async () => {
     if (pendingAction) return;
 
+    const version = ++requestVersion.current;
     setCopied(false);
     setError("");
+    setHasResult(false);
     setPendingAction("generate");
 
     try {
@@ -395,6 +565,7 @@ export function MilitaryAIDemoClient() {
           service: "militaryAi",
           tool: activeToolId,
           sourceText: sourceText || defaultSource,
+          exampleId: selectedExampleId,
         }),
       });
       const body = await response.json();
@@ -402,18 +573,23 @@ export function MilitaryAIDemoClient() {
         throw new Error(body.error || "AI 생성에 실패했습니다.");
       }
       const payload = body.result as DemoResultPayload;
-      setLastPayload(payload);
-      setGeneratedMarkdown(payload.markdown);
-      setOutput(outputFromPayload(payload));
+      if (version === requestVersion.current) {
+        setLastPayload(payload);
+        setGeneratedMarkdown(payload.markdown);
+        setOutput(outputFromPayload(payload));
+        setHasResult(true);
+      }
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : "AI 생성에 실패했습니다.");
+      if (version === requestVersion.current) {
+        setError(requestError instanceof Error ? requestError.message : "AI 생성에 실패했습니다.");
+      }
     } finally {
       setPendingAction("");
     }
   };
 
   const saveAsNode = async () => {
-    if (pendingAction) return;
+    if (pendingAction || !hasResult) return;
 
     setError("");
     setPendingAction("save");
@@ -447,6 +623,7 @@ export function MilitaryAIDemoClient() {
     if (pendingAction) return;
 
     setActiveToolId("adminDocument");
+    setSelectedExampleId(defaultExample.id);
     setSourceText(defaultSource);
     const resetOutput = makeOutput("adminDocument", defaultSource);
     const resetMarkdown = makeMarkdown(tools[0], resetOutput);
@@ -456,10 +633,12 @@ export function MilitaryAIDemoClient() {
     setSelectedNodeId(baseNodes[0].id);
     setCopied(false);
     setError("");
+    setHasResult(false);
+    requestVersion.current += 1;
   };
 
   const copyMarkdown = async () => {
-    if (pendingAction) return;
+    if (pendingAction || !hasResult) return;
 
     setError("");
 
@@ -483,7 +662,7 @@ export function MilitaryAIDemoClient() {
               <h2 className="text-base font-semibold">입력</h2>
             </div>
 
-            <div className="mt-4 grid grid-cols-2 gap-2">
+            <div className="mt-4 grid grid-cols-2 gap-2" data-tour-id="military-ai-tools">
               {tools.map((tool) => {
                 const Icon = tool.icon;
                 const active = tool.id === activeToolId;
@@ -493,8 +672,7 @@ export function MilitaryAIDemoClient() {
                     key={tool.id}
                     type="button"
                     aria-pressed={active}
-                    onClick={() => setActiveToolId(tool.id)}
-                    disabled={Boolean(pendingAction)}
+                    onClick={() => selectTool(tool.id)}
                     className={`flex min-h-16 items-center gap-2 rounded-lg border px-3 py-2 text-left text-sm transition disabled:cursor-not-allowed disabled:opacity-60 ${
                       active
                         ? tool.accent
@@ -508,30 +686,52 @@ export function MilitaryAIDemoClient() {
               })}
             </div>
 
-            <label className="mt-4 block text-sm font-medium text-slate-700" htmlFor="demo-source">
-              메모
-            </label>
-            <textarea
-              id="demo-source"
-              value={sourceText}
-              onChange={(event) => setSourceText(event.target.value)}
-              className="mt-2 min-h-56 w-full resize-y rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm leading-6 outline-none transition focus:border-slate-400 focus:bg-white"
-            />
+            <p data-testid="military-mode-description" className="mt-3 text-xs leading-5 text-slate-500">
+              {activeTool.description}
+            </p>
+
+            <div data-tour-id="military-ai-input">
+              <label className="mt-4 block text-sm font-medium text-slate-700" htmlFor="military-example">
+                예시 입력
+              </label>
+              <select
+                id="military-example"
+                aria-label="예시 입력"
+                value={selectedExampleId}
+                onChange={(event) => selectExample(event.target.value)}
+                className="mt-2 h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm"
+              >
+                {activeExamples.map((example) => (
+                  <option key={example.id} value={example.id}>{example.label}</option>
+                ))}
+              </select>
+
+              <label className="mt-4 block text-sm font-medium text-slate-700" htmlFor="demo-source">
+                메모
+              </label>
+              <textarea
+                id="demo-source"
+                value={sourceText}
+                onChange={(event) => editSource(event.target.value)}
+                className="mt-2 min-h-56 w-full resize-y rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm leading-6 outline-none transition focus:border-slate-400 focus:bg-white"
+              />
+            </div>
 
             <div className="mt-4 grid grid-cols-[1fr_1fr_auto] gap-2">
               <button
                 type="button"
+                data-tour-id="military-ai-generate"
                 onClick={generate}
                 disabled={Boolean(pendingAction)}
                 className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-slate-950 px-3 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60"
               >
                 <Sparkles className="h-4 w-4" />
-                {pendingAction === "generate" ? "Generating" : "Generate"}
+                {pendingAction === "generate" ? "생성 중..." : activeTool.ctaLabel}
               </button>
               <button
                 type="button"
                 onClick={saveAsNode}
-                disabled={Boolean(pendingAction)}
+                disabled={Boolean(pendingAction) || !hasResult}
                 className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-3 text-sm font-medium text-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 <Save className="h-4 w-4" />
@@ -550,72 +750,55 @@ export function MilitaryAIDemoClient() {
             {error ? <p className="mt-3 text-sm font-semibold text-red-700">{error}</p> : null}
           </aside>
 
-          <section className="rounded-lg border border-slate-200 bg-white p-4">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <div className="flex items-center gap-2">
-                  <ActiveIcon className="h-5 w-5 text-slate-600" />
-                  <h2 className="text-base font-semibold">AI 산출</h2>
-                </div>
-                <p className="mt-1 text-sm font-medium text-slate-900">{output.title}</p>
-              </div>
-              <button
-                type="button"
-                onClick={copyMarkdown}
-                disabled={Boolean(pendingAction)}
-                className="inline-flex h-9 items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 text-sm font-medium text-slate-700 disabled:cursor-not-allowed disabled:opacity-60"
+          {!hasResult ? (
+            <section className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-600">
+              {activeTool.ctaLabel}을 실행하면 문서 유형에 맞는 AI 산출이 여기에 표시됩니다.
+            </section>
+          ) : null}
+          <AiTypewriter
+            segments={outputTextSegments(output, activeToolId)}
+            enabled={hasResult && /^gemini(?:-|$)/i.test(lastPayload.model)}
+            resetKey={requestVersion.current}
+            completionMessage="Gemini 문서 생성이 완료되었습니다."
+          >
+            {({ segments, isComplete, skip }) => {
+              const visibleOutput = outputWithSegments(output, segments, activeToolId);
+              return <section
+                data-testid="military-result-panel"
+                data-tour-id="military-ai-output"
+                hidden={!hasResult}
+                className="rounded-lg border border-slate-200 bg-white p-4"
               >
-                <Copy className="h-4 w-4" />
-                {copied ? "Copied" : "Markdown"}
-              </button>
-            </div>
-
-            <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-4">
-              <p className="text-sm leading-6 text-slate-700">{output.summary}</p>
-            </div>
-
-            <div className="mt-4 grid gap-3 lg:grid-cols-2">
-              {output.sections.map((section) => (
-                <article key={section.label} className="rounded-lg border border-slate-200 p-4">
-                  <h3 className="text-sm font-semibold text-slate-900">{section.label}</h3>
-                  <p className="mt-2 text-sm leading-6 text-slate-600">{section.body}</p>
-                </article>
-              ))}
-            </div>
-
-            <div className="mt-4 grid gap-4 lg:grid-cols-[1fr_0.8fr]">
-              <div className="rounded-lg border border-slate-200 p-4">
-                <h3 className="text-sm font-semibold">후속조치</h3>
-                <div className="mt-3 space-y-2">
-                  {output.actions.map((action) => (
-                    <div key={action} className="flex gap-2 text-sm text-slate-700">
-                      <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
-                      <span className="leading-5">{action}</span>
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <ActiveIcon className="h-5 w-5 text-slate-600" />
+                      <h2 className="text-base font-semibold">AI 산출</h2>
                     </div>
-                  ))}
+                    <p className="mt-1 text-sm font-medium text-slate-900">{visibleOutput.title}</p>
+                    <p className="mt-1 text-xs text-slate-500">{generationLabel(lastPayload.model)}</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={copyMarkdown}
+                    disabled={Boolean(pendingAction) || !hasResult}
+                    className="inline-flex h-9 items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 text-sm font-medium text-slate-700 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    <Copy className="h-4 w-4" />
+                    {copied ? "Copied" : "Markdown"}
+                  </button>
                 </div>
-              </div>
 
-              <div className="rounded-lg border border-slate-200 p-4">
-                <h3 className="text-sm font-semibold">보안 검토</h3>
-                <div className="mt-3 space-y-2">
-                  {output.security.map((item) => (
-                    <div key={item.label} className="flex items-start gap-2 text-sm">
-                      {item.status === "pass" ? (
-                        <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
-                      ) : (
-                        <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
-                      )}
-                      <div>
-                        <p className="font-medium text-slate-800">{item.label}</p>
-                        <p className="mt-1 text-xs leading-5 text-slate-500">{item.note}</p>
-                      </div>
-                    </div>
-                  ))}
+                <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-4">
+                  <p className="text-sm leading-6 text-slate-700">{visibleOutput.summary}</p>
                 </div>
-              </div>
-            </div>
-          </section>
+
+                <ResultBody toolId={activeToolId} output={visibleOutput} />
+                {!isComplete && /^gemini(?:-|$)/i.test(lastPayload.model) ? <button type="button" onClick={skip} className="mt-4 text-xs font-semibold text-blue-800 underline">결과 바로 보기</button> : null}
+              </section>;
+            }}
+          </AiTypewriter>
+          {hasResult && !/^gemini(?:-|$)/i.test(lastPayload.model) ? <span className="sr-only" role="status">대체 결과 표시가 완료되었습니다.</span> : null}
 
           <aside className="rounded-lg border border-slate-200 bg-white p-4">
             <div className="flex items-center gap-2">

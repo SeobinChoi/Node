@@ -1,5 +1,11 @@
 import { expect, test } from "@playwright/test";
 
+const DISMISSED_TOUR = JSON.stringify({ status: "dismissed", pageIndex: 0, stepIndex: 0, direction: "forward" });
+
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript((value) => sessionStorage.setItem("node-public-demo-tour-v1", value), DISMISSED_TOUR);
+});
+
 test("login page renders and exposes Google auth provider", async ({ page, request }) => {
   await page.goto("/login");
 
@@ -29,8 +35,8 @@ test("public military AI demo generates output and saves a node", async ({ page 
   await page.goto("/military-ai-demo");
 
   await expect(page.getByRole("heading", { name: "문서지원 통합" })).toBeVisible();
-  await page.getByRole("button", { name: "Generate" }).click();
-  await expect(page.getByText("AI 산출")).toBeVisible();
+  await page.getByRole("button", { name: "문서 초안 작성" }).click();
+  await expect(page.getByTestId("military-result-panel").getByText("AI 산출")).toBeVisible({ timeout: 15_000 });
   await expect(page.getByRole("heading", { name: "후속조치" })).toBeVisible();
 
   await page.getByRole("button", { name: "Save" }).click();
@@ -53,11 +59,255 @@ test("public service demos load and respond to sample-data actions", async ({ pa
     await page.goto(demo.path);
     await expect(page.getByRole("heading", { name: demo.heading })).toBeVisible();
     await page.getByRole("button", { name: demo.action }).click();
-    await expect(page.getByTestId("demo-result-panel")).toBeVisible();
+    await expect(page.getByTestId("demo-result-panel")).toBeVisible({ timeout: 15_000 });
     await expect(page.getByTestId("saved-service-panel")).toContainText(
       "저장된 시연 항목",
     );
   }
+});
+
+test("public document modes load three distinct selectable examples", async ({ page }) => {
+  const demos = [
+    { path: "/military-ai-demo", nextMode: "회의", textarea: "메모" },
+    { path: "/admin-doc-demo", nextMode: "결재요지", textarea: "초안 작성 메모" },
+    { path: "/after-action-demo", nextMode: "주간", textarea: "회의·훈련 메모" },
+  ];
+
+  for (const demo of demos) {
+    await page.goto(demo.path);
+    const source = page.getByLabel(demo.textarea);
+    const examples = page.getByLabel("예시 입력");
+    await expect(examples.locator("option")).toHaveCount(3);
+    const initialSource = await source.inputValue();
+
+    await page.getByRole("button", { name: demo.nextMode, exact: true }).click();
+    await expect(source).not.toHaveValue(initialSource);
+    const firstModeSource = await source.inputValue();
+
+    await examples.selectOption({ index: 1 });
+    await expect(source).not.toHaveValue(firstModeSource);
+  }
+});
+
+test("document mode buttons change the actual working UI", async ({ page }) => {
+  await page.goto("/military-ai-demo");
+  await page.getByRole("button", { name: "회의", exact: true }).click();
+  await expect(page.getByTestId("military-mode-description")).toContainText("결정");
+  await expect(page.getByRole("button", { name: "회의록 요약" })).toBeVisible();
+  await page.getByRole("button", { name: "보안", exact: true }).click();
+  await expect(page.getByTestId("military-mode-description")).toContainText("마스킹");
+  await expect(page.getByRole("button", { name: "보안 검토" })).toBeVisible();
+
+  await page.goto("/admin-doc-demo");
+  await page.getByRole("button", { name: "작성안내" }).click();
+  await expect(page.getByTestId("admin-guide-panel")).toBeVisible();
+  await page.getByRole("button", { name: "결재요지" }).click();
+  await expect(page.getByTestId("admin-generation-panel")).toContainText("결재 요청");
+  await page.getByRole("button", { name: "나의 임시문서" }).click();
+  await expect(page.getByTestId("admin-drafts-panel")).toBeVisible();
+
+  await page.goto("/after-action-demo");
+  await page.getByRole("button", { name: "주간", exact: true }).click();
+  await expect(page.getByTestId("after-action-mode-description")).toContainText("차주");
+  await page.getByRole("button", { name: "조치", exact: true }).click();
+  await expect(page.getByTestId("after-action-mode-description")).toContainText("담당");
+});
+
+test("interactive public demo controls do not overflow on mobile", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  for (const path of ["/military-ai-demo", "/ops-radar-demo", "/admin-doc-demo", "/after-action-demo"]) {
+    await page.goto(path);
+    const dimensions = await page.evaluate(() => ({ width: document.documentElement.clientWidth, scrollWidth: document.documentElement.scrollWidth }));
+    expect(dimensions.scrollWidth).toBeLessThanOrEqual(dimensions.width);
+    await expect(page.getByRole("main")).toBeVisible();
+  }
+});
+
+test("first browser session tutorial visits all four public demos", async ({ browser }) => {
+  const context = await browser.newContext();
+  const page = await context.newPage();
+  await page.goto("/military-ai-demo");
+  await expect(page.getByRole("heading", { name: "Node 공개 시연에 오신 것을 환영합니다" })).toBeVisible();
+  await page.getByRole("button", { name: "시작", exact: true }).click();
+  await expect(page.getByText("화면 1/4 · 단계 1/3")).toBeVisible();
+  await page.getByRole("button", { name: "다음", exact: true }).click();
+  await page.getByRole("button", { name: "다음", exact: true }).click();
+  await page.getByRole("button", { name: "다음", exact: true }).click();
+  await expect(page).toHaveURL(/\/ops-radar-demo$/);
+  await expect(page.getByText("화면 2/4 · 단계 1/2")).toBeVisible();
+  await page.getByRole("button", { name: "다음", exact: true }).click();
+  await page.getByRole("button", { name: "다음", exact: true }).click();
+  await expect(page).toHaveURL(/\/admin-doc-demo$/);
+  await expect(page.getByText("화면 3/4 · 단계 1/2")).toBeVisible();
+  await page.getByRole("button", { name: "다음", exact: true }).click();
+  await page.getByRole("button", { name: "다음", exact: true }).click();
+  await expect(page).toHaveURL(/\/after-action-demo$/);
+  await expect(page.getByText("화면 4/4 · 단계 1/2")).toBeVisible();
+  await page.getByRole("button", { name: "다음", exact: true }).click();
+  await page.getByRole("button", { name: "완료", exact: true }).click();
+  await expect(page.getByText("화면 4/4")).toHaveCount(0);
+  expect(await page.evaluate(() => JSON.parse(sessionStorage.getItem("node-public-demo-tour-v1") ?? "null")?.status)).toBe("completed");
+  await page.goto("/military-ai-demo");
+  await expect(page.getByRole("heading", { name: "Node 공개 시연에 오신 것을 환영합니다" })).toHaveCount(0);
+  await context.close();
+});
+
+test("military security result preserves every generated section", async ({ page }) => {
+  const labels = ["위험수준", "탐지항목", "사유", "권장 대체표현", "안전한 재작성", "최종 점검"];
+  await page.route("**/api/demo/generate", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ result: {
+        title: "보안 검토 결과",
+        summary: "전체 섹션 보존 확인",
+        sections: labels.map((label) => ({ label, body: `${label} 본문` })),
+        actions: ["마스킹 확인"],
+        security: [{ label: "민감정보", status: "warn" }],
+        metrics: [],
+        workItems: [],
+        markdown: "# 보안 검토",
+        model: "gemini-test",
+      } }),
+    });
+  });
+
+  await page.goto("/military-ai-demo");
+  await page.getByRole("button", { name: "보안", exact: true }).click();
+  await page.getByRole("button", { name: "보안 검토", exact: true }).click();
+  await page.getByRole("button", { name: "결과 바로 보기" }).click();
+  for (const label of labels) await expect(page.getByRole("heading", { name: label })).toBeVisible();
+});
+
+test("Gemini output types progressively and can be revealed immediately", async ({ page }) => {
+  const result = {
+    title: "타이포 애니메이션 최종 제목",
+    summary: "이 문장은 Gemini 결과가 순차적으로 표시되는지 확인한다. " + "확인 문장 ".repeat(80),
+    sections: [{ label: "현황", body: "표시할 본문" }],
+    actions: ["후속조치 확인"],
+    security: [],
+    metrics: [],
+    workItems: [],
+    markdown: "# 타이포 애니메이션 최종 제목",
+    model: "gemini-test",
+  };
+  await page.route("**/api/demo/generate", (route) => route.fulfill({ json: { ok: true, result } }));
+  await page.goto("/military-ai-demo");
+  await page.getByRole("button", { name: "문서 초안 작성" }).click();
+  const panel = page.getByTestId("military-result-panel");
+  await expect(panel).toBeVisible();
+  await expect(panel).not.toContainText(result.summary);
+  await page.getByRole("button", { name: "결과 바로 보기" }).click();
+  await expect(panel).toContainText(result.title);
+  await expect(panel).toContainText(result.summary);
+});
+
+test("reduced motion shows Gemini output immediately", async ({ page }) => {
+  const result = {
+    title: "접근 가능한 결과",
+    summary: "동작 줄이기 환경에서는 즉시 표시된다.",
+    sections: [], actions: [], security: [], metrics: [], workItems: [],
+    markdown: "# 접근 가능한 결과",
+    model: "gemini-test",
+  };
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.route("**/api/demo/generate", (route) => route.fulfill({ json: { ok: true, result } }));
+  await page.goto("/military-ai-demo");
+  await page.getByRole("button", { name: "문서 초안 작성" }).click();
+  await expect(page.getByTestId("military-result-panel")).toContainText(result.summary);
+  await expect(page.getByRole("button", { name: "결과 바로 보기" })).toHaveCount(0);
+});
+
+test("non-Gemini fallback output appears immediately without typing controls", async ({ page }) => {
+  const result = {
+    title: "규칙 기반 결과",
+    summary: "대체문은 즉시 표시된다.",
+    sections: [{ label: "현황", body: "본문" }],
+    actions: [],
+    security: [],
+    metrics: [],
+    workItems: [],
+    markdown: "# 규칙 기반 결과",
+    model: "curated-sample-fallback",
+  };
+  await page.route("**/api/demo/generate", (route) => route.fulfill({ json: { ok: true, result } }));
+  await page.goto("/military-ai-demo");
+  await page.getByRole("button", { name: "문서 초안 작성" }).click();
+  await expect(page.getByTestId("military-result-panel")).toContainText(result.summary);
+  await expect(page.getByRole("button", { name: "결과 바로 보기" })).toHaveCount(0);
+});
+
+test("invalidating input disables stale persistence and derived panels", async ({ page }) => {
+  const result = {
+    title: "기존 결과",
+    summary: "기존 입력에서 생성됨",
+    sections: [{ label: "현황", body: "기존 본문" }],
+    actions: ["기존 조치"],
+    security: [],
+    metrics: [],
+    workItems: [{ title: "STALE TASK", owner: "담당", status: "대기", risk: "low" }],
+    markdown: "# 기존 결과",
+    model: "curated-sample-fallback",
+  };
+  await page.route("**/api/demo/generate", (route) => route.fulfill({ json: { ok: true, result } }));
+
+  await page.goto("/admin-doc-demo");
+  const secondary = page.getByRole("button", { name: "요지 복사" });
+  await expect(secondary).toBeDisabled();
+  await page.getByRole("button", { name: "초안 작성" }).click();
+  await expect(secondary).toBeEnabled();
+  await expect(page.getByText("STALE TASK")).toBeVisible();
+  await page.getByLabel("초안 작성 메모").fill("새 입력");
+  await expect(secondary).toBeDisabled();
+  await expect(page.getByText("STALE TASK")).toHaveCount(0);
+
+  await page.goto("/military-ai-demo");
+  const save = page.getByRole("button", { name: "Save" });
+  await expect(save).toBeDisabled();
+  await page.getByRole("button", { name: "문서 초안 작성" }).click();
+  await expect(save).toBeEnabled();
+  await page.getByLabel("메모").fill("새 입력");
+  await expect(save).toBeDisabled();
+});
+
+test("editing source clears output and discards a stale generation response", async ({ page }) => {
+  await page.route("**/api/demo/generate", async (route) => {
+    await new Promise((resolve) => setTimeout(resolve, 150));
+    await route.fulfill({
+      json: {
+        ok: true,
+        result: {
+          title: "늦게 도착한 결과",
+          summary: "폐기되어야 하는 결과",
+          sections: [{ label: "현황", body: "이전 입력" }],
+          actions: ["검토"],
+          security: [],
+          metrics: [],
+          workItems: [],
+          markdown: "# 늦게 도착한 결과",
+          model: "gemini-test",
+        },
+      },
+    });
+  });
+
+  await page.goto("/admin-doc-demo");
+  await expect(page.getByTestId("demo-result-panel")).toBeHidden();
+  await page.getByRole("button", { name: "초안 작성" }).click();
+  await page.getByLabel("초안 작성 메모").fill("새로운 사용자 입력");
+  await page.waitForTimeout(250);
+  await expect(page.getByTestId("demo-result-panel")).toBeHidden();
+  await expect(page.getByText("늦게 도착한 결과")).toHaveCount(0);
+
+  await page.getByRole("button", { name: "초안 작성" }).click();
+  await page.getByRole("button", { name: "결재요지", exact: true }).click();
+  await page.waitForTimeout(250);
+  await expect(page.getByTestId("demo-result-panel")).toBeHidden();
+
+  await page.getByRole("button", { name: "초안 작성" }).click();
+  await page.getByLabel("예시 입력").selectOption({ index: 1 });
+  await page.waitForTimeout(250);
+  await expect(page.getByTestId("demo-result-panel")).toBeHidden();
 });
 
 test("bare auth middleware still rejects protected routes", async ({ page }) => {

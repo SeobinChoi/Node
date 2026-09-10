@@ -21,6 +21,7 @@ export interface MilitaryAIRequest {
     sourceText: string;
     systemPrompt: string;
     responseShape: string;
+    provider?: MilitaryAIProvider;
     userInstruction?: string;
     metadata?: Record<string, unknown>;
     temperature?: number;
@@ -315,7 +316,7 @@ export async function generateMilitaryAIJson(request: MilitaryAIRequest): Promis
     ]);
 
     const prompt = buildMilitaryPrompt(request);
-    const provider = getMilitaryAIProvider();
+    const provider = request.provider ?? getMilitaryAIProvider();
     const model = provider === "gemini"
         ? process.env.GEMINI_MODEL || DEFAULT_GEMINI_MODEL
         : DEFAULT_OPENAI_MODEL;

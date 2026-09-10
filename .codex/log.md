@@ -433,3 +433,4 @@
 - Added task add/delete, transitive cycle prevention, strict saved-snapshot validation, and server-side HWPX generation via `hwp-convert`.
 - Verified 34/34 unit tests, 10/10 Ops Radar Playwright tests, zero-warning targeted ESLint, TypeScript, and Next.js production build.
 - Closed adversarial review findings with strict anonymous-write validation/rate limits, bounded XML-safe HWPX input, semantic date/dependency checks, and stale-report invalidation.
+- 2026-09-10: Reworked all 18 public document examples into varied Korean working-note formats, restricted phone numbers to 010-0000-0000/010-1111-1111, replaced actionable security details with placeholders, and verified fixture/service tests 32/32 plus targeted ESLint and diff checks.
