@@ -1,10 +1,16 @@
 import { randomUUID } from "node:crypto";
+import { z } from "zod";
 import { prisma } from "@/lib/db/prisma";
 import {
     generateMilitaryAIJson,
     scanMilitarySensitiveContent,
     type MilitaryAIResult,
 } from "@/lib/ai/military-documents";
+import {
+    exampleById,
+    isUnmodifiedExample,
+    type PublicDocumentTool,
+} from "@/lib/demo/public-document-examples";
 
 export type PublicDemoService = "militaryAi" | "opsRadar" | "adminDoc" | "afterAction";
 
@@ -16,6 +22,7 @@ export interface PublicDemoSection {
 export interface PublicDemoWorkItem {
     title: string;
     owner: string;
+    dueDate: string;
     status: string;
     risk: "low" | "medium" | "high";
 }
@@ -69,37 +76,21 @@ const SERVICE_LABELS: Record<PublicDemoService, string> = {
     afterAction: "회의·훈련 사후조치",
 };
 
-const FALLBACK_METRICS: Record<PublicDemoService, PublicDemoMetric[]> = {
-    militaryAi: [
-        { label: "AI 도구", value: "5", note: "실연동" },
-        { label: "저장", value: "DB", note: "시연 저장" },
-        { label: "보안", value: "검토", note: "자동 점검" },
-    ],
-    opsRadar: [
-        { label: "고위험", value: "2", note: "우선 조치" },
-        { label: "지연과업", value: "4", note: "담당 확인" },
-        { label: "보고가능", value: "11", note: "현황 유지" },
-    ],
-    adminDoc: [
-        { label: "문서블록", value: "5", note: "보고 구조" },
-        { label: "보안주의", value: "0", note: "더미 기준" },
-        { label: "검토단계", value: "3", note: "제출 전" },
-    ],
-    afterAction: [
-        { label: "교훈사항", value: "4", note: "유지/개선" },
-        { label: "미결조치", value: "6", note: "추적 필요" },
-        { label: "주간보고", value: "3", note: "보고 반영" },
-    ],
-};
-
 const RESPONSE_SHAPES = {
     adminDocument: `{
   "title": "문서 제목",
   "summary": "3문장 이내 요약",
   "draft": "본문 초안",
-  "sections": [{"heading": "항목명", "body": "항목별 본문"}],
+  "sections": [{"heading": "보고 목적 | 현황 | 문제점 | 조치계획 | 미확정값 | 검토항목 중 하나", "body": "항목별 본문"}],
   "missingInputs": ["추가 확인이 필요한 값"],
   "reviewChecklist": ["보안/사실/결재선 확인 항목"]
+}`,
+    approvalDocument: `{
+  "title": "결재문서 제목",
+  "summary": "결재 요지 3문장 이내 요약",
+  "sections": [{"heading": "결재 요지 | 추진 근거 | 요청사항 | 일정·비용 | 검토·승인 조건 중 하나", "body": "항목별 본문"}],
+  "missingInputs": ["추가 확인이 필요한 값"],
+  "reviewChecklist": ["결재선/예산/일정 확인 항목"]
 }`,
     meetingSummary: `{
   "title": "회의록 제목",
@@ -147,7 +138,9 @@ const RESPONSE_SHAPES = {
 
 const SYSTEM_PROMPTS = {
     adminDocument:
-        "You draft Korean military administrative documents for a public no-login demo. Use only the provided dummy input, avoid real names/units/locations, and return review-ready JSON.",
+        "You draft Korean military administrative status report documents (보고서: 보고 목적/현황/문제점/조치계획) for a public no-login demo. Use only the provided dummy input, avoid real names/units/locations, and return review-ready JSON.",
+    approvalDocument:
+        "You draft Korean approval request documents (결재문서: 결재 요지/추진 근거/요청사항/일정·비용/검토·승인 조건) for a public no-login demo. This is a decision request, not a status report — focus on what is being requested and why, use only the provided dummy input, avoid real names/units/locations, and return review-ready JSON.",
     meetingSummary:
         "You prepare Korean meeting minutes for a public no-login demo. Preserve decisions and action ownership, mark unknown facts as [미정], and return review-ready JSON.",
     aarSummary:
@@ -161,7 +154,8 @@ const SYSTEM_PROMPTS = {
 };
 
 const TOOL_INSTRUCTIONS = {
-    adminDocument: "Create a military administrative document draft that can be reviewed by a human officer.",
+    adminDocument: "Create a military administrative status report draft (보고 목적, 현황, 문제점, 조치계획, 미확정값, 검토항목) that can be reviewed by a human officer.",
+    approvalDocument: "Create an approval request draft (결재 요지, 추진 근거, 요청사항, 일정·비용, 검토·승인 조건). Do not reuse the status-report structure.",
     meetingSummary: "Summarize notes into decisions, action items, open questions, and review checks.",
     aarSummary: "Create a meeting or training after-action review summary from notes and observations.",
     weeklyReport: "Create a weekly situation report from project and unit notes.",
@@ -238,28 +232,36 @@ function arrayValues(value: unknown): string[] {
 
 function sectionsFromGenerated(generated: Record<string, unknown>): PublicDemoSection[] {
     const rawSections = generated.sections;
-    if (Array.isArray(rawSections)) {
-        const sections = rawSections
-            .map((section) => {
-                if (!section || typeof section !== "object") return null;
-                const record = section as Record<string, unknown>;
-                return {
-                    label: textValue(record.heading, textValue(record.label, "정리 항목")),
-                    body: textValue(record.body, stringifyValue(section)),
-                };
-            })
-            .filter((section): section is PublicDemoSection => Boolean(section))
-            .slice(0, 5);
-        if (sections.length > 0) return sections;
-    }
+    if (!Array.isArray(rawSections)) return [];
 
-    return Object.entries(generated)
-        .filter(([key, value]) => !["title", "summary", "reviewChecklist", "sections"].includes(key) && value)
-        .slice(0, 4)
-        .map(([key, value]) => ({
-            label: key,
-            body: Array.isArray(value) ? value.map(stringifyValue).join("\n") : stringifyValue(value),
-        }));
+    return rawSections
+        .map((section) => {
+            if (!section || typeof section !== "object") return null;
+            const record = section as Record<string, unknown>;
+            return {
+                label: textValue(record.heading, textValue(record.label, "정리 항목")),
+                body: textValue(record.body, stringifyValue(section)),
+            };
+        })
+        .filter((section): section is PublicDemoSection => Boolean(section));
+}
+
+function securitySectionsFromGenerated(generated: Record<string, unknown>): PublicDemoSection[] {
+    const redactions = Array.isArray(generated.recommendedRedactions)
+        ? (generated.recommendedRedactions as Record<string, unknown>[])
+        : [];
+    const categories = redactions.map((item) => textValue(item.category)).filter(Boolean).join(", ");
+    const reasons = redactions.map((item) => textValue(item.reason)).filter(Boolean).join(" ");
+    const replacements = redactions.map((item) => textValue(item.replacement)).filter(Boolean).join(", ");
+
+    return [
+        { label: "위험수준", body: textValue(generated.riskLevel, "[미정]") },
+        { label: "탐지항목", body: categories || "[미정]" },
+        { label: "사유", body: reasons || "[미정]" },
+        { label: "권장 대체표현", body: replacements || "[미정]" },
+        { label: "안전한 재작성", body: textValue(generated.safeRewrite, "[미정]") },
+        { label: "최종 점검", body: arrayValues(generated.reviewChecklist).join(" / ") || "[미정]" },
+    ];
 }
 
 function actionsFromGenerated(generated: Record<string, unknown>): string[] {
@@ -271,24 +273,76 @@ function actionsFromGenerated(generated: Record<string, unknown>): string[] {
     return ["담당자 검토", "민감정보 재확인", "저장 후 시연 결과 확인"];
 }
 
-function workItemsFromActions(actions: string[], service: PublicDemoService): PublicDemoWorkItem[] {
-    const owners = service === "opsRadar"
-        ? ["작전계획반", "군수반", "참모부", "교육훈련반"]
-        : ["문서 담당", "검토 담당", "보안 담당", "보고 담당"];
-    const risks: Array<PublicDemoWorkItem["risk"]> = ["medium", "high", "low", "medium"];
+const STRUCTURED_ACTION_KEYS = ["actionItems", "decisions", "risks"] as const;
+const VALID_RISKS: ReadonlyArray<PublicDemoWorkItem["risk"]> = ["low", "medium", "high"];
 
-    return actions.slice(0, 4).map((action, index) => ({
-        title: action.length > 44 ? `${action.slice(0, 44)}...` : action,
-        owner: owners[index % owners.length],
+interface GeneratedActionRecord {
+    title: string;
+    owner?: string;
+    dueDate?: string;
+    risk?: string;
+}
+
+function structuredActionRecords(generated: Record<string, unknown>): GeneratedActionRecord[] {
+    for (const key of STRUCTURED_ACTION_KEYS) {
+        const raw = generated[key];
+        if (!Array.isArray(raw) || raw.length === 0) continue;
+
+        const records = raw
+            .map((item): GeneratedActionRecord | null => {
+                if (!item || typeof item !== "object") return null;
+                const record = item as Record<string, unknown>;
+                const title = textValue(record.task, textValue(record.decision, textValue(record.risk, "")));
+                if (!title) return null;
+
+                return {
+                    title,
+                    owner: textValue(record.owner) || undefined,
+                    dueDate: textValue(record.dueDate) || undefined,
+                    risk: textValue(record.risk) || undefined,
+                };
+            })
+            .filter((record): record is GeneratedActionRecord => record !== null);
+
+        if (records.length > 0) return records;
+    }
+
+    return [];
+}
+
+function workItemsFromGenerated(generated: Record<string, unknown>, actions: string[]): PublicDemoWorkItem[] {
+    const structured = structuredActionRecords(generated);
+    const source: GeneratedActionRecord[] = structured.length > 0
+        ? structured
+        : actions.map((title) => ({ title }));
+
+    return source.slice(0, 4).map((item, index) => ({
+        title: item.title.length > 44 ? `${item.title.slice(0, 44)}...` : item.title,
+        owner: item.owner ?? "[미정]",
+        dueDate: item.dueDate ?? "[미정]",
         status: index === 0 ? "조치" : index === 1 ? "검토" : "대기",
-        risk: risks[index % risks.length],
+        risk: VALID_RISKS.includes(item.risk as PublicDemoWorkItem["risk"])
+            ? (item.risk as PublicDemoWorkItem["risk"])
+            : "medium",
     }));
 }
 
-function sourceExcerpt(sourceText: string): string {
-    const normalized = sourceText.trim().replace(/\s+/g, " ");
-    return normalized.length > 90 ? `${normalized.slice(0, 90)}...` : normalized;
+function metricsFromResult({
+    sections,
+    actions,
+    securityFlagCount,
+}: {
+    sections: PublicDemoSection[];
+    actions: string[];
+    securityFlagCount: number;
+}): PublicDemoMetric[] {
+    return [
+        { label: "구성 항목", value: String(sections.length), note: "결과 섹션 수" },
+        { label: "후속조치", value: String(actions.length), note: "조치·확인 항목 수" },
+        { label: "보안 플래그", value: String(securityFlagCount), note: securityFlagCount === 0 ? "탐지 없음" : "검토 필요" },
+    ];
 }
+
 
 function needsDeterministicFallback(
     generated: Record<string, unknown>,
@@ -302,120 +356,148 @@ function needsDeterministicFallback(
         || arrayValues(generated.actionItems).length === 0;
 }
 
-function fallbackGeneratedForService({
-    service,
+function opsRadarDeterministicFallback({ mode, sourceText }: { mode: string; sourceText: string }): Record<string, unknown> {
+    const documentLabel = mode === "weekly" ? "주간 진행보고" : mode === "action" ? "병목 조치계획" : "지휘관 상황보고";
+    const lines = sourceText.split("\n");
+    const line = (prefix: string) => lines.find((item) => item.startsWith(prefix))?.replace(/^metrics:\s*|^-\s*/, "");
+    const after = (heading: string) => {
+        const index = lines.indexOf(heading);
+        return index >= 0 ? lines[index + 1]?.replace(/^-\s*/, "") : undefined;
+    };
+    const metrics = line("metrics:") ?? "평가 지표 없음";
+    const bottleneck = after(lines.find((item) => item.startsWith("bottlenecks (")) ?? "") ?? "즉시 조치가 필요한 병목 없음";
+    const recommendation = after("recommendations:") ?? "현재 업무 상태를 유지하며 재평가";
+    return {
+        title: `${documentLabel} 초안`,
+        summary: `평가된 현재 과업 관계를 기준으로 정리했습니다. ${metrics}.`,
+        sections: [
+            { heading: "현재 상황", body: metrics },
+            { heading: "핵심 병목", body: bottleneck },
+            { heading: "우선 조치", body: recommendation },
+        ],
+        actionItems: [recommendation],
+        reviewChecklist: ["실제 부대명 제거", "담당 부서 표기 확인", "기한 확정값 확인"],
+    };
+}
+
+export class PublicDemoGenerationError extends Error {}
+export class PublicDemoSensitiveInputError extends Error {}
+
+const SectionShapeSchema = z.object({
+    heading: z.string().optional(),
+    label: z.string().optional(),
+    body: z.string().min(1),
+});
+
+const TitleSummaryShape = {
+    title: z.string().min(1),
+    summary: z.string().min(1),
+};
+
+const CATALOG_TOOL_SCHEMAS: Record<PublicDocumentTool, z.ZodTypeAny> = {
+    adminDocument: z.object({
+        ...TitleSummaryShape,
+        sections: z.array(SectionShapeSchema).min(1),
+    }).passthrough(),
+    approvalDocument: z.object({
+        ...TitleSummaryShape,
+        sections: z.array(SectionShapeSchema).min(1),
+    }).passthrough(),
+    meetingSummary: z
+        .object({
+            ...TitleSummaryShape,
+            sections: z.array(SectionShapeSchema).min(1),
+            decisions: z
+                .array(z.object({ decision: z.string().min(1), owner: z.string().optional(), dueDate: z.string().optional() }))
+                .optional(),
+            actionItems: z
+                .array(z.object({
+                    task: z.string().min(1),
+                    owner: z.string().optional(),
+                    dueDate: z.string().optional(),
+                    risk: z.string().optional(),
+                }))
+                .optional(),
+        }).passthrough()
+        .refine((value) => (value.decisions?.length ?? 0) + (value.actionItems?.length ?? 0) > 0, {
+            message: "meetingSummary requires decisions or actionItems",
+        }),
+    aarSummary: z
+        .object({
+            ...TitleSummaryShape,
+            sections: z.array(SectionShapeSchema).min(1),
+            sustain: z.array(z.string()).optional(),
+            improve: z.array(z.string()).optional(),
+            actionItems: z
+                .array(z.object({ task: z.string().min(1), owner: z.string().optional(), dueDate: z.string().optional(), risk: z.string().optional() }))
+                .optional(),
+        }).passthrough()
+        .refine((value) => (value.sustain?.length ?? 0) + (value.improve?.length ?? 0) > 0, {
+            message: "aarSummary requires sustain or improve",
+        }),
+    weeklyReport: z
+        .object({
+            ...TitleSummaryShape,
+            sections: z.array(SectionShapeSchema).min(1),
+            completed: z.array(z.string()).optional(),
+            inProgress: z.array(z.string()).optional(),
+            risks: z
+                .array(z.object({ risk: z.string().min(1), impact: z.string().optional(), mitigation: z.string().optional() }))
+                .optional(),
+            nextWeek: z.array(z.string()).optional(),
+        }).passthrough()
+        .refine((value) => (value.completed?.length ?? 0) + (value.inProgress?.length ?? 0) > 0, {
+            message: "weeklyReport requires completed or inProgress",
+        }),
+    securityScan: z.object({
+        ...TitleSummaryShape,
+        riskLevel: z.string().min(1),
+        recommendedRedactions: z
+            .array(z.object({ category: z.string().min(1), reason: z.string().optional(), replacement: z.string().optional() }))
+            .min(1),
+        safeRewrite: z.string().min(1),
+    }).passthrough(),
+};
+
+function validatedGeneratedForCatalogTool(
+    tool: PublicDocumentTool,
+    generated: Record<string, unknown>,
+): Record<string, unknown> | null {
+    const parsed = CATALOG_TOOL_SCHEMAS[tool].safeParse(generated);
+    return parsed.success ? (parsed.data as Record<string, unknown>) : null;
+}
+
+function honestFallbackOrThrow({
     tool,
-    mode,
+    exampleId,
     sourceText,
 }: {
-    service: PublicDemoService;
-    tool: keyof typeof RESPONSE_SHAPES;
-    mode: string;
+    tool: PublicDocumentTool;
+    exampleId?: string;
     sourceText: string;
-}): Record<string, unknown> {
-    const excerpt = sourceExcerpt(sourceText);
+}): { generated: Record<string, unknown>; model: string } {
+    const example = exampleId ? exampleById(exampleId) : undefined;
 
-    if (service === "afterAction") {
+    if (example && example.tool === tool && isUnmodifiedExample(exampleId as string, sourceText)) {
         return {
-            title: mode === "weekly" ? "사후조치 주간상황보고 초안" : "회의·훈련 사후조치 요약",
-            summary: `입력 메모를 사후조치, 개선사항, 차주 보고 항목으로 분리했습니다. 입력 요약: ${excerpt}`,
-            sections: [
-                { heading: "유지할 점", body: "현황 공유와 담당 부서 분리는 유지합니다." },
-                { heading: "개선할 점", body: "입력 마감과 위험요인 등록 기준을 사전에 고정합니다." },
-                { heading: "차주 반영", body: "미결 조치는 주간상황보고의 진행 항목으로 추적합니다." },
-            ],
-            actionItems: [
-                { task: "입력 마감 D-3 기준 적용", owner: "교육훈련반", dueDate: "[미정]" },
-                { task: "위험요인 등록 양식 표준화", owner: "작전계획반", dueDate: "[미정]" },
-                { task: "사후조치 결과 주간보고 반영", owner: "보고 담당", dueDate: "[미정]" },
-            ],
-            reviewChecklist: ["실제 훈련명 비식별 확인", "담당 부서 표기 확인", "일정 확정값 확인"],
+            generated: {
+                title: example.baselineResult.title,
+                summary: example.baselineResult.summary,
+                sections: example.baselineResult.sections.map((section) => ({ heading: section.label, body: section.body })),
+                actionItems: example.baselineResult.actions.map((action) => ({
+                    task: action.title,
+                    owner: action.owner,
+                    dueDate: action.dueDate,
+                    risk: action.risk,
+                })),
+            },
+            model: "curated-sample-fallback",
         };
     }
 
-    if (tool === "opsRadarReport") {
-        const documentLabel = mode === "weekly" ? "주간 진행보고" : mode === "action" ? "병목 조치계획" : "지휘관 상황보고";
-        const lines = sourceText.split("\n");
-        const line = (prefix: string) => lines.find((item) => item.startsWith(prefix))?.replace(/^metrics:\s*|^-\s*/, "");
-        const after = (heading: string) => {
-            const index = lines.indexOf(heading);
-            return index >= 0 ? lines[index + 1]?.replace(/^-\s*/, "") : undefined;
-        };
-        const metrics = line("metrics:") ?? "평가 지표 없음";
-        const bottleneck = after(lines.find((item) => item.startsWith("bottlenecks (")) ?? "") ?? "즉시 조치가 필요한 병목 없음";
-        const recommendation = after("recommendations:") ?? "현재 업무 상태를 유지하며 재평가";
-        return {
-            title: `${documentLabel} 초안`,
-            summary: `평가된 현재 과업 관계를 기준으로 정리했습니다. ${metrics}.`,
-            sections: [
-                { heading: "현재 상황", body: metrics },
-                { heading: "핵심 병목", body: bottleneck },
-                { heading: "우선 조치", body: recommendation },
-            ],
-            actionItems: [recommendation],
-            reviewChecklist: ["실제 부대명 제거", "담당 부서 표기 확인", "기한 확정값 확인"],
-        };
-    }
-
-    if (tool === "securityScan") {
-        return {
-            title: "제출 전 보안 검토 요약",
-            summary: `공개 시연 입력 기준으로 민감정보 포함 여부를 점검했습니다. 입력 요약: ${excerpt}`,
-            riskLevel: "medium",
-            recommendedRedactions: [
-                { category: "부대·위치", reason: "실제 값 입력 가능성", replacement: "[부대명] / [장소]" },
-                { category: "담당자", reason: "개인정보 보호", replacement: "[담당자]" },
-            ],
-            safeRewrite: "실제 부대명, 담당자명, 장소, 세부 일정은 일반화해 제출용 문장으로 정리합니다.",
-            reviewChecklist: ["실명 제거", "위치·일정 일반화", "첨부파일명 재확인"],
-        };
-    }
-
-    if (tool === "weeklyReport") {
-        return {
-            title: "주간상황보고 초안",
-            summary: `입력 메모를 완료, 진행, 위험, 차주 계획으로 분류했습니다. 입력 요약: ${excerpt}`,
-            completed: ["회의 결과 정리", "담당 부서별 확인 항목 분리"],
-            inProgress: ["점검표 회수", "일정 조정", "위험 항목 추적"],
-            risks: [
-                { risk: "미확정 일정", impact: "보고 지연 가능", mitigation: "D-3 기준으로 확정값 재확인" },
-            ],
-            nextWeek: ["미결 항목 회수", "보고 문안 검토", "보안 표현 재점검"],
-            reviewChecklist: ["수치 사실 확인", "실제 부대명 제거", "차주 일정 확인"],
-        };
-    }
-
-    if (tool === "meetingSummary") {
-        return {
-            title: "회의록 요약 초안",
-            summary: `입력 메모를 결정사항과 후속조치로 정리했습니다. 입력 요약: ${excerpt}`,
-            decisions: [
-                { decision: "지연 항목을 별도 추적", owner: "보고 담당", dueDate: "[미정]" },
-            ],
-            actionItems: [
-                { task: "미제출 항목 회수", owner: "군수반", dueDate: "[미정]", risk: "medium" },
-                { task: "안전 통제 인원 확인", owner: "작전계획반", dueDate: "[미정]", risk: "medium" },
-            ],
-            sections: [
-                { heading: "결정사항", body: "보고 전 미결 항목을 분리하고 담당 부서를 지정합니다." },
-                { heading: "미결사항", body: "일정, 통제 인원, 점검표 회수 여부를 재확인합니다." },
-            ],
-            reviewChecklist: ["참석자 실명 제거", "결정사항 사실 확인", "기한 확정값 확인"],
-        };
-    }
-
-    return {
-        title: service === "militaryAi" ? "행정문서 초안" : "합동 점검 준비 보고 초안",
-        summary: `입력 메모를 보고 목적, 주요 경과, 미결사항, 조치계획으로 정리했습니다. 입력 요약: ${excerpt}`,
-        draft: "합동 점검 준비 현황을 보고하며, 미제출 점검표와 일정 조정 사항은 담당 부서 확인 후 확정합니다.",
-        sections: [
-            { heading: "보고 목적", body: "준비 현황과 지연 항목을 지휘 계통에 간결히 공유합니다." },
-            { heading: "주요 경과", body: "점검표 회수, 일정 조정, 안전 통제 인원 확인이 진행 중입니다." },
-            { heading: "조치 계획", body: "미결 항목을 담당 부서별로 배정하고 제출 전 보안 문구를 재검토합니다." },
-        ],
-        missingInputs: ["최종 일정", "담당 부서 확정값", "제출용 비식별 표현"],
-        reviewChecklist: ["실제 부대명 제거", "담당자 실명 제거", "결재선 확인", "첨부 증빙 보안 검토"],
-    };
+    throw new PublicDemoGenerationError(
+        "Public demo generation failed and no unmodified example fallback is available for this input.",
+    );
 }
 
 function markdownFromResult(service: PublicDemoService, result: Omit<PublicDemoResult, "markdown">): string {
@@ -448,7 +530,9 @@ function resolveTool(service: PublicDemoService, tool: string, mode: string): ke
     }
 
     if (service === "adminDoc") {
-        return mode === "security" ? "securityScan" : "adminDocument";
+        if (mode === "approval") return "approvalDocument";
+        if (mode === "security") return "securityScan";
+        return "adminDocument";
     }
 
     if (service === "opsRadar") {
@@ -469,20 +553,33 @@ export async function generatePublicDemoResult({
     tool = "",
     mode = "",
     sourceText,
+    exampleId,
 }: {
     service: PublicDemoService;
     tool?: string;
     mode?: string;
     sourceText: string;
+    exampleId?: string;
 }): Promise<PublicDemoResult> {
     const resolvedTool = resolveTool(service, tool, mode);
-    let generated: MilitaryAIResult;
+    const isOpsRadar = resolvedTool === "opsRadarReport";
+    const localFlags = scanMilitarySensitiveContent([sourceText]);
+    const isCatalogExample = Boolean(exampleId && isUnmodifiedExample(exampleId, sourceText));
+
+    if (localFlags.length > 0 && !isCatalogExample) {
+        throw new PublicDemoSensitiveInputError("실제 민감정보로 보이는 입력은 외부 AI로 전송하지 않습니다. 비식별 합성 데이터로 바꿔 주세요.");
+    }
+
+    let effectiveGenerated: Record<string, unknown>;
+    let effectiveModel: string;
+
     try {
-        generated = await generateMilitaryAIJson({
+        const generated: MilitaryAIResult = await generateMilitaryAIJson({
             projectName: DEMO_PROJECT_NAME,
             sourceText,
+            provider: "gemini",
             systemPrompt: SYSTEM_PROMPTS[resolvedTool],
-            userInstruction: resolvedTool === "opsRadarReport" ? opsRadarInstruction(mode) : TOOL_INSTRUCTIONS[resolvedTool],
+            userInstruction: isOpsRadar ? opsRadarInstruction(mode) : TOOL_INSTRUCTIONS[resolvedTool],
             responseShape: RESPONSE_SHAPES[resolvedTool],
             metadata: {
                 publicDemo: true,
@@ -494,43 +591,50 @@ export async function generatePublicDemoResult({
             temperature: resolvedTool === "securityScan" ? 0.2 : 0.25,
             maxTokens: 1400,
         });
-    } catch {
-        generated = {
-            generated: fallbackGeneratedForService({
-                service,
-                tool: resolvedTool,
-                mode,
-                sourceText,
-            }),
-            securityFlags: scanMilitarySensitiveContent([sourceText]),
-            model: "deterministic-demo-fallback",
-        };
-    }
-    let effectiveGenerated = generated.generated;
 
-    if (needsDeterministicFallback(effectiveGenerated, service, resolvedTool)) {
-        effectiveGenerated = fallbackGeneratedForService({
-            service,
-            tool: resolvedTool,
-            mode,
-            sourceText,
-        });
-        generated = {
-            ...generated,
-            generated: effectiveGenerated,
-            model: "deterministic-demo-fallback",
-        };
+        if (isOpsRadar) {
+            if (needsDeterministicFallback(generated.generated, service, resolvedTool)) {
+                effectiveGenerated = opsRadarDeterministicFallback({ mode, sourceText });
+                effectiveModel = "deterministic-demo-fallback";
+            } else {
+                effectiveGenerated = generated.generated;
+                effectiveModel = generated.model;
+            }
+        } else {
+            const validated = validatedGeneratedForCatalogTool(resolvedTool, generated.generated);
+            if (validated) {
+                effectiveGenerated = validated;
+                effectiveModel = generated.model;
+            } else {
+                const fallback = honestFallbackOrThrow({ tool: resolvedTool, exampleId, sourceText });
+                effectiveGenerated = fallback.generated;
+                effectiveModel = fallback.model;
+            }
+        }
+    } catch (error) {
+        if (error instanceof PublicDemoGenerationError) throw error;
+
+        if (isOpsRadar) {
+            effectiveGenerated = opsRadarDeterministicFallback({ mode, sourceText });
+            effectiveModel = "deterministic-demo-fallback";
+        } else {
+            const fallback = honestFallbackOrThrow({ tool: resolvedTool, exampleId, sourceText });
+            effectiveGenerated = fallback.generated;
+            effectiveModel = fallback.model;
+        }
     }
 
     const title = textValue(effectiveGenerated.title, SERVICE_LABELS[service]);
     const summary = textValue(effectiveGenerated.summary, "입력 내용을 공개 시연용 결과로 정리했습니다.");
     const actions = actionsFromGenerated(effectiveGenerated);
-    const sections = sectionsFromGenerated(effectiveGenerated);
-    const localFlags = scanMilitarySensitiveContent([sourceText]);
+    const sections = resolvedTool === "securityScan" && effectiveModel !== "curated-sample-fallback"
+        ? securitySectionsFromGenerated(effectiveGenerated)
+        : sectionsFromGenerated(effectiveGenerated);
+    const resolvedSections = sections.length > 0 ? sections : [{ label: "요약", body: summary }];
     const partial: Omit<PublicDemoResult, "markdown"> = {
         title,
         summary,
-        sections: sections.length > 0 ? sections : [{ label: "요약", body: summary }],
+        sections: resolvedSections,
         actions,
         security: [
             {
@@ -540,11 +644,11 @@ export async function generatePublicDemoResult({
             },
             { label: "공개 시연", status: "pass", note: "로그인 없이 더미 데이터로만 동작" },
         ],
-        metrics: FALLBACK_METRICS[service],
-        workItems: workItemsFromActions(actions, service),
-        model: generated.model,
+        metrics: metricsFromResult({ sections: resolvedSections, actions, securityFlagCount: localFlags.length }),
+        workItems: workItemsFromGenerated(effectiveGenerated, actions),
+        model: effectiveModel,
         generatedKeys: Object.keys(effectiveGenerated),
-        securityFlagCount: generated.securityFlags.length,
+        securityFlagCount: localFlags.length,
     };
 
     return {

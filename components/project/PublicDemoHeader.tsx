@@ -1,15 +1,15 @@
 "use client";
 
 import { MonitorCheck } from "lucide-react";
+import {
+  PUBLIC_DEMO_TOUR_PAGES,
+  PublicDemoTour,
+  type PublicDemoTourPageId,
+} from "@/components/project/PublicDemoTour";
 
-export type PublicDemoHeaderVariant = "militaryAi" | "opsRadar" | "adminDoc" | "afterAction";
+export type PublicDemoHeaderVariant = PublicDemoTourPageId;
 
-const routeLinks: Array<{ label: string; href: string; variant: PublicDemoHeaderVariant }> = [
-  { label: "문서지원", href: "/military-ai-demo", variant: "militaryAi" },
-  { label: "과업상황", href: "/ops-radar-demo", variant: "opsRadar" },
-  { label: "행정문서", href: "/admin-doc-demo", variant: "adminDoc" },
-  { label: "사후조치", href: "/after-action-demo", variant: "afterAction" },
-];
+const routeLinks = PUBLIC_DEMO_TOUR_PAGES;
 
 const headerThemes: Record<PublicDemoHeaderVariant, { background: string; border: string; text: string }> = {
   militaryAi: {
@@ -62,15 +62,16 @@ export function PublicDemoHeader({
         </div>
 
         <nav className="flex flex-wrap gap-1" aria-label="Public demos">
+          <PublicDemoTour currentPage={variant} />
           {routeLinks.map((link) => {
-            const isActive = link.variant === variant;
+            const isActive = link.id === variant;
             const className = isActive
               ? `border-white bg-white ${theme.text}`
               : "border-white/35 bg-transparent text-white hover:bg-white/10";
 
             return (
               <a
-                key={`${link.href}-${link.label}`}
+                key={link.href}
                 href={link.href}
                 className={`border px-3 py-1.5 text-[13px] font-medium transition ${className}`}
               >

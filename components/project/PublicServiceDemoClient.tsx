@@ -1,11 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
-  AlertTriangle,
-  Archive,
-  BarChart3,
   Bell,
+  BookOpen,
   CalendarDays,
   CheckCircle2,
   ChevronRight,
@@ -14,22 +12,25 @@ import {
   ClipboardList,
   Copy,
   Database,
-  FileCheck2,
   FileSearch,
   FileText,
-  Filter,
-  GitBranch,
+  FolderOpen,
   Home,
-  LayoutDashboard,
-  Menu,
   RefreshCcw,
   Save,
   UserCheck,
   type LucideIcon,
 } from "lucide-react";
 import { PublicDemoHeader } from "@/components/project/PublicDemoHeader";
+import { AiTypewriter } from "@/components/project/AiTypewriter";
+import { publicDemoTourTarget } from "@/components/project/PublicDemoTour";
+import {
+  examplesForTool,
+  type PublicDocumentExample,
+  type PublicDocumentTool,
+} from "@/lib/demo/public-document-examples";
 
-export type PublicServiceDemoVariant = "opsRadar" | "adminDoc" | "afterAction";
+export type PublicServiceDemoVariant = "adminDoc" | "afterAction";
 
 interface DemoMode {
   id: string;
@@ -53,6 +54,7 @@ interface WorkItem {
   owner: string;
   status: string;
   risk: "low" | "medium" | "high";
+  dueDate?: string;
 }
 
 interface DemoConfig {
@@ -66,10 +68,6 @@ interface DemoConfig {
   defaultInput: string;
   modes: DemoMode[];
   metrics: Metric[];
-  resultTitle: string;
-  resultLead: string;
-  resultSections: ResultSection[];
-  workItems: WorkItem[];
   evidence: string[];
   savedTitle: string;
 }
@@ -96,67 +94,6 @@ interface SavedDemoArtifact {
 }
 
 const demoConfigs: Record<PublicServiceDemoVariant, DemoConfig> = {
-  opsRadar: {
-    title: "작전 과업 병목관리",
-    subtitle: "부서별 과업, 병목, 위험도를 한 화면에서 점검하는 공개 샘플 화면",
-    routeLabel: "과업상황",
-    icon: BarChart3,
-    primaryAction: "재계산",
-    secondaryAction: "화면 고정",
-    inputLabel: "상황 메모",
-    defaultInput:
-      "장비 점검표 2건이 지연되고 야간 통신 점검 인원 배치가 미확정이다. 군수반은 예비 배터리 수량을 재확인하고 작전계획반은 우천 시 대체 일정을 정리한다.",
-    modes: [
-      { id: "risk", label: "위험도" },
-      { id: "owner", label: "담당" },
-      { id: "timeline", label: "일정" },
-    ],
-    metrics: [
-      {
-        label: "고위험",
-        value: "2",
-        note: "검토 필요",
-        tone: "border-rose-200 bg-rose-50 text-rose-900",
-      },
-      {
-        label: "지연과업",
-        value: "4",
-        note: "소유자 확인",
-        tone: "border-amber-200 bg-amber-50 text-amber-900",
-      },
-      {
-        label: "보고가능",
-        value: "11",
-        note: "보고 가능",
-        tone: "border-emerald-200 bg-emerald-50 text-emerald-900",
-      },
-    ],
-    resultTitle: "병목 재계산 결과",
-    resultLead:
-      "지연 원인은 자료 미제출과 승인 대기 두 갈래로 분리된다. 보고 전에는 장비 점검표와 안전 통제 인원 배치가 먼저 닫혀야 한다.",
-    resultSections: [
-      {
-        label: "우선 조치",
-        body: "군수반 점검표 회수, 작전계획반 대체 일정 작성, 참모부 위험문구 검토를 같은 마감선에 묶는다.",
-      },
-      {
-        label: "노드 연결",
-        body: "점검표 취합 노드는 야간 통신 점검과 주간상황보고 노드 모두의 선행조건으로 표시한다.",
-      },
-    ],
-    workItems: [
-      { title: "점검표 미제출 회수", owner: "군수반", status: "지연", risk: "high" },
-      { title: "야간 통신 안전 통제", owner: "작전계획반", status: "검토", risk: "high" },
-      { title: "주간상황보고 초안", owner: "참모부", status: "보고가능", risk: "medium" },
-      { title: "대체 일정 후보", owner: "교육훈련반", status: "초안", risk: "low" },
-    ],
-    evidence: [
-      "실명, 군번, 실제 부대명 없이 예시 데이터만 표시",
-      "그래프 병목 판단은 브라우저 내부 샘플 규칙으로 계산",
-      "인증 프로젝트 데이터와 분리된 공개 캡처용 화면",
-    ],
-    savedTitle: "상황판 스냅샷",
-  },
   adminDoc: {
     title: "행정문서 작성지원",
     subtitle: "회의 메모를 행정문서 초안, 결재 요지, 보안 점검 목록으로 정리하는 공개 샘플 화면",
@@ -192,32 +129,9 @@ const demoConfigs: Record<PublicServiceDemoVariant, DemoConfig> = {
         tone: "border-violet-200 bg-violet-50 text-violet-900",
       },
     ],
-    resultTitle: "행정문서 초안",
-    resultLead:
-      "입력 메모를 목적, 주요 경과, 미결사항, 조치계획, 보안 확인으로 정리했다. 실제 제출 전에는 기관명과 담당자 값을 최종 확인해야 한다.",
-    resultSections: [
-      {
-        label: "보고 목적",
-        body: "합동 점검 준비 현황과 지연 항목을 지휘 계통에 간결히 공유한다.",
-      },
-      {
-        label: "조치 계획",
-        body: "미제출 점검표 회수, 안전 통제 인원 확정, 우천 시 대체 일정 검토를 순차 진행한다.",
-      },
-      {
-        label: "보안 확인",
-        body: "현재 화면은 예시 데이터이며 실명, 연락처, 실제 위치, 세부 작전계획을 포함하지 않는다.",
-      },
-    ],
-    workItems: [
-      { title: "보고 목적 문단", owner: "자동작성", status: "생성", risk: "low" },
-      { title: "미결사항 표", owner: "참모 검토", status: "검토", risk: "medium" },
-      { title: "보안 문구", owner: "보안 담당", status: "확인", risk: "low" },
-      { title: "결재 요지", owner: "문서 담당", status: "초안", risk: "medium" },
-    ],
     evidence: [
       "공개 페이지에서 결재 문서 흐름을 직접 조작 가능",
-      "출력은 샘플 텍스트이며 외부 생성 API 호출 없이 결정적 생성",
+      "문서 작성은 Gemini API를 사용하며 장애 시 샘플 fallback으로 명시",
       "보고서에는 실제 증빙이 아닌 샘플 서비스 화면으로 표기 필요",
     ],
     savedTitle: "임시 문서 초안",
@@ -257,33 +171,10 @@ const demoConfigs: Record<PublicServiceDemoVariant, DemoConfig> = {
         tone: "border-indigo-200 bg-indigo-50 text-indigo-900",
       },
     ],
-    resultTitle: "사후조치 요약",
-    resultLead:
-      "사후검토의 개선사항을 주간상황보고용 실행 항목으로 변환했다. 입력 마감과 위험요인 등록 양식을 표준화하는 것이 다음 주 핵심 과업이다.",
-    resultSections: [
-      {
-        label: "유지할 점",
-        body: "과업 그래프를 통해 지연 위치와 담당 부서를 빠르게 확인한 점은 유지한다.",
-      },
-      {
-        label: "개선할 점",
-        body: "점검표 제출 마감과 위험요인 입력 기준을 사전에 고정해 부서별 편차를 줄인다.",
-      },
-      {
-        label: "주간보고 반영",
-        body: "미결 조치 6건은 다음 주 보고의 진행 항목으로 자동 편성한다.",
-      },
-    ],
-    workItems: [
-      { title: "D-3 입력 마감 고정", owner: "교육훈련반", status: "조치", risk: "medium" },
-      { title: "위험요인 등록 양식", owner: "작전계획반", status: "초안", risk: "high" },
-      { title: "사후검토 결과 공유", owner: "참모부", status: "확인", risk: "low" },
-      { title: "다음 주 보고 반영", owner: "보고 담당", status: "대기", risk: "medium" },
-    ],
     evidence: [
       "사후검토, 회의록, 주간보고가 한 화면에 연결됨",
       "민감 실제 훈련명 없이 예시 일정과 부서명만 사용",
-      "저장 동작은 브라우저 상태 기반의 캡처용 시뮬레이션",
+      "저장 결과는 공개 데모 저장소에 보관되며 화면에서 다시 확인 가능",
     ],
     savedTitle: "사후조치 묶음",
   },
@@ -301,6 +192,29 @@ const riskLabel: Record<WorkItem["risk"], string> = {
   high: "높음",
 };
 
+function generationLabel(model: string) {
+  if (/fallback/i.test(model)) return "샘플 fallback";
+  return /^gemini(?:-|$)/i.test(model) ? "Gemini 생성" : `AI 생성 · ${model}`;
+}
+
+function resultTextSegments(result: LiveDemoResult): string[] {
+  return [
+    result.title,
+    result.summary,
+    ...result.sections.flatMap((section) => [section.label, section.body]),
+  ];
+}
+
+function resultWithSegments(result: LiveDemoResult, segments: string[]): LiveDemoResult {
+  let index = 0;
+  return {
+    ...result,
+    title: segments[index++],
+    summary: segments[index++],
+    sections: result.sections.map(() => ({ label: segments[index++], body: segments[index++] })),
+  };
+}
+
 function ResultSectionBlock({ section }: { section: ResultSection }) {
   return (
     <section className="border-t border-slate-200 pt-4">
@@ -310,22 +224,17 @@ function ResultSectionBlock({ section }: { section: ResultSection }) {
   );
 }
 
-function fallbackResultFromConfig(config: DemoConfig): LiveDemoResult {
-  const markdownSections = config.resultSections
-    .map((section) => `## ${section.label}\n${section.body}`)
-    .join("\n\n");
-  const actions = config.workItems.map((item) => `${item.owner}: ${item.title}`);
-
+function emptyResult(): LiveDemoResult {
   return {
-    title: config.resultTitle,
-    summary: config.resultLead,
-    sections: config.resultSections,
-    actions,
-    security: config.evidence.map((item) => ({ label: "시연 조건", status: "pass", note: item })),
-    metrics: config.metrics.map(({ label, value, note }) => ({ label, value, note })),
-    workItems: config.workItems,
-    markdown: `# ${config.resultTitle}\n\n${config.resultLead}\n\n${markdownSections}\n\n## 처리항목\n${actions.map((action) => `- ${action}`).join("\n")}`,
-    model: "initial-demo-state",
+    title: "",
+    summary: "",
+    sections: [],
+    actions: [],
+    security: [],
+    metrics: [],
+    workItems: [],
+    markdown: "",
+    model: "",
   };
 }
 
@@ -478,6 +387,10 @@ interface DemoState {
   setMode: (mode: string) => void;
   sourceText: string;
   setSourceText: (value: string) => void;
+  examples: PublicDocumentExample[];
+  selectedExampleId: string;
+  selectExample: (exampleId: string) => void;
+  hasResult: boolean;
   result: LiveDemoResult;
   displayMetrics: Metric[];
   savedArtifacts: SavedDemoArtifact[];
@@ -486,9 +399,44 @@ interface DemoState {
   pendingAction: string;
   error: string;
   sourceWordCount: number;
-  generatedLead: string;
+  generationKey: number;
   runPrimaryAction: () => void;
   runSecondaryAction: () => void;
+  cancelPending: () => void;
+}
+
+function TypewrittenDemoResult({
+  state,
+  children,
+}: {
+  state: DemoState;
+  children: (result: LiveDemoResult, complete: boolean, skip: () => void) => ReactNode;
+}) {
+  const animated = state.hasResult && /^gemini(?:-|$)/i.test(state.result.model);
+  return (
+    <>
+      <AiTypewriter
+        segments={resultTextSegments(state.result)}
+        enabled={animated}
+        resetKey={state.generationKey}
+        completionMessage="Gemini 문서 생성이 완료되었습니다."
+      >
+        {({ segments, isComplete, skip }) => children(resultWithSegments(state.result, segments), isComplete, skip)}
+      </AiTypewriter>
+      {state.hasResult && !animated ? <span className="sr-only" role="status">대체 결과 표시가 완료되었습니다.</span> : null}
+    </>
+  );
+}
+
+function toolForMode(variant: PublicServiceDemoVariant, mode: string): PublicDocumentTool {
+  if (variant === "adminDoc") {
+    if (mode === "approval") return "approvalDocument";
+    if (mode === "security") return "securityScan";
+    return "adminDocument";
+  }
+  if (mode === "weekly") return "weeklyReport";
+  if (mode === "actions") return "meetingSummary";
+  return "aarSummary";
 }
 
 export function PublicServiceDemoClient({
@@ -497,13 +445,19 @@ export function PublicServiceDemoClient({
   variant: PublicServiceDemoVariant;
 }) {
   const config = demoConfigs[variant];
-  const [mode, setMode] = useState(config.modes[0]?.id ?? "default");
-  const [sourceText, setSourceText] = useState(config.defaultInput);
-  const [result, setResult] = useState<LiveDemoResult>(() => fallbackResultFromConfig(config));
+  const initialMode = config.modes[0]?.id ?? "default";
+  const initialExample = examplesForTool(toolForMode(variant, initialMode))[0];
+  const [mode, setMode] = useState(initialMode);
+  const [selectedExampleId, setSelectedExampleId] = useState(initialExample.id);
+  const [sourceText, setSourceText] = useState(initialExample.sourceText);
+  const [result, setResult] = useState<LiveDemoResult>(emptyResult);
   const [savedArtifacts, setSavedArtifacts] = useState<SavedDemoArtifact[]>([]);
   const [copied, setCopied] = useState(false);
   const [pendingAction, setPendingAction] = useState("");
   const [error, setError] = useState("");
+  const [hasResult, setHasResult] = useState(false);
+  const requestVersion = useRef(0);
+  const examples = useMemo(() => examplesForTool(toolForMode(variant, mode)), [mode, variant]);
 
   useEffect(() => {
     let mounted = true;
@@ -532,34 +486,71 @@ export function PublicServiceDemoClient({
   );
 
   const displayMetrics = useMemo(() => {
-    const liveMetrics = result.metrics.length > 0 ? result.metrics : config.metrics;
+    const liveMetrics = hasResult ? result.metrics : [];
     return liveMetrics.slice(0, 3).map((metric, index) => ({
       ...config.metrics[index % config.metrics.length],
       ...metric,
       tone: config.metrics[index % config.metrics.length].tone,
     }));
-  }, [config.metrics, result.metrics]);
+  }, [config.metrics, hasResult, result.metrics]);
+
+  function clearResult() {
+    requestVersion.current += 1;
+    setHasResult(false);
+    setResult(emptyResult);
+    setCopied(false);
+    setError("");
+  }
+
+  function changeMode(nextMode: string) {
+    if (nextMode === mode) return;
+    const example = examplesForTool(toolForMode(variant, nextMode))[0];
+    clearResult();
+    setMode(nextMode);
+    setSelectedExampleId(example.id);
+    setSourceText(example.sourceText);
+  }
+
+  function selectExample(exampleId: string) {
+    const example = examples.find((item) => item.id === exampleId);
+    if (!example) return;
+    clearResult();
+    setSelectedExampleId(example.id);
+    setSourceText(example.sourceText);
+  }
+
+  function editSource(value: string) {
+    clearResult();
+    setSourceText(value);
+  }
 
   async function runPrimaryAction() {
     if (pendingAction) return;
 
+    const version = ++requestVersion.current;
     setCopied(false);
     setError("");
+    setHasResult(false);
     setPendingAction(config.primaryAction);
 
     try {
       const response = await fetch("/api/demo/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ service: variant, mode, sourceText }),
+        body: JSON.stringify({ service: variant, mode, sourceText, exampleId: selectedExampleId }),
       });
       const body = await response.json();
       if (!response.ok || !body.result) {
         throw new Error(body.error || "생성에 실패했습니다.");
       }
-      setResult(body.result);
+      if (version === requestVersion.current) {
+        setResult(body.result);
+        setHasResult(true);
+      }
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : "생성에 실패했습니다.");
+      if (version === requestVersion.current) {
+        setError(requestError instanceof Error ? requestError.message : "생성에 실패했습니다.");
+      }
     } finally {
       setPendingAction("");
     }
@@ -579,7 +570,7 @@ export function PublicServiceDemoClient({
   }
 
   async function runSecondaryAction() {
-    if (pendingAction) return;
+    if (pendingAction || !hasResult) return;
 
     setError("");
     setPendingAction(config.secondaryAction);
@@ -607,9 +598,13 @@ export function PublicServiceDemoClient({
     config,
     variant,
     mode,
-    setMode,
+    setMode: changeMode,
     sourceText,
-    setSourceText,
+    setSourceText: editSource,
+    examples,
+    selectedExampleId,
+    selectExample,
+    hasResult,
     result,
     displayMetrics,
     savedArtifacts,
@@ -618,214 +613,225 @@ export function PublicServiceDemoClient({
     pendingAction,
     error,
     sourceWordCount,
-    generatedLead: result.summary,
+    generationKey: requestVersion.current,
     runPrimaryAction,
     runSecondaryAction,
+    cancelPending: clearResult,
   };
 
   if (variant === "adminDoc") {
     return <AdminDocumentPortal state={state} />;
   }
 
-  if (variant === "afterAction") {
-    return <AfterActionBoard state={state} />;
-  }
-
-  return <OpsRadarConsole state={state} />;
+  return <AfterActionBoard state={state} />;
 }
 
-function OpsRadarConsole({ state }: { state: DemoState }) {
-  const { config, mode, setMode, sourceText, setSourceText } = state;
+type AdminGenerationMode = "report" | "approval" | "security";
+type AdminView = "guide" | AdminGenerationMode | "drafts";
 
+const ADMIN_NAV_ITEMS: Array<{ id: AdminView; label: string }> = [
+  { id: "guide", label: "작성안내" },
+  { id: "report", label: "보고서식" },
+  { id: "approval", label: "결재요지" },
+  { id: "security", label: "보안검토" },
+  { id: "drafts", label: "나의 임시문서" },
+];
+
+const ADMIN_GENERATION_COPY: Record<
+  AdminGenerationMode,
+  { helper: string; ctaHint: string; resultLabel: string }
+> = {
+  report: {
+    helper: "회의나 점검 메모를 목적·현황·문제점·조치계획 순서의 보고서 초안으로 정리합니다.",
+    ctaHint: "메모를 정리해 보고서 초안을 만듭니다.",
+    resultLabel: "보고서 미리보기",
+  },
+  approval: {
+    helper: "결재 요청에 필요한 추진 근거와 요청사항을 정리해 결재 문서를 만듭니다.",
+    ctaHint: "결재 요청 문서를 작성합니다.",
+    resultLabel: "결재 문서 미리보기",
+  },
+  security: {
+    helper: "제출 전 개인정보·세부 위치·기관명 등 민감정보 노출 여부를 점검합니다.",
+    ctaHint: "민감정보 마스킹 여부를 검토합니다.",
+    resultLabel: "보안 검토 결과",
+  },
+};
+
+function AdminGuidePanel() {
   return (
-    <main className="min-h-screen bg-[#e8edf2] text-slate-900">
-      <PublicDemoHeader variant="opsRadar" title={config.title} />
-
-      <div className="mx-auto grid max-w-7xl gap-5 px-4 py-5 sm:px-6 lg:grid-cols-[230px_1fr] lg:px-8">
-        <aside className="border border-slate-400 bg-white">
-          <div className="flex items-center justify-between border-b border-slate-300 bg-slate-100 px-3 py-2">
-            <span className="text-sm font-semibold text-slate-900">작전 메뉴</span>
-            <Menu className="h-4 w-4 text-slate-600" aria-hidden="true" />
-          </div>
-          <div className="divide-y divide-slate-200 text-sm">
-            {["실시간 병목", "부서별 과업", "승인 대기", "보고 스냅샷"].map((item, index) => (
-              <div
-                key={item}
-                className={`flex items-center justify-between px-3 py-2 ${
-                  index === 0 ? "bg-[#dce8f2] font-semibold text-[#173f61]" : "text-slate-700"
-                }`}
-              >
-                <span>{item}</span>
-                <ChevronRight className="h-4 w-4" aria-hidden="true" />
-              </div>
-            ))}
-          </div>
-          <div className="m-3 border border-amber-500 bg-[#fff8e5] p-3 text-sm text-slate-800">
-            <div className="flex items-center gap-2 font-semibold text-amber-800">
-              <AlertTriangle className="h-4 w-4" aria-hidden="true" />
-              샘플 데이터
-            </div>
-            <p className="mt-2 leading-6">
-              실제 작전망, 위치, 부대명과 분리된 공개 캡처용 상황판입니다.
-            </p>
-          </div>
-        </aside>
-
-        <section className="min-w-0 space-y-5">
-          <div className="border border-slate-400 bg-white">
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-              <div className="px-4 pt-4">
-                <p className="text-sm font-semibold text-[#173f61]">작전상황판 / 공개 샘플</p>
-                <h2 className="mt-1 text-2xl font-semibold tracking-normal text-slate-950">
-                  합동작전 병목상황판
-                </h2>
-                <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">{config.subtitle}</p>
-              </div>
-              <div className="flex flex-wrap gap-2 px-4 text-xs lg:pb-4">
-                <span className="border border-slate-400 bg-slate-100 px-3 py-2 font-semibold text-slate-800">
-                  공개 샘플망
-                </span>
-                <span className="border border-slate-400 bg-white px-3 py-2 font-semibold text-slate-800">
-                  {state.result.model}
-                </span>
-              </div>
-            </div>
-
-            <div className="mt-4 grid border-t border-slate-300 md:grid-cols-3">
-              {state.displayMetrics.map((metric) => (
-                <div key={metric.label} className="border-b border-slate-300 p-4 md:border-r md:last:border-r-0">
-                  <p className="text-sm font-semibold text-slate-700">{metric.label}</p>
-                  <div className="mt-2 flex items-end justify-between">
-                    <strong className="text-3xl font-semibold tracking-normal text-slate-950">
-                      {metric.value}
-                    </strong>
-                    <span className="border border-slate-300 bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700">
-                      {metric.note}
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="grid gap-5 xl:grid-cols-[0.9fr_1.1fr]">
-            <section className="border border-slate-400 bg-white p-4 text-slate-950">
-              <div className="flex items-center justify-between">
-                <h2 className="text-base font-semibold">상황 입력 및 재계산</h2>
-                <Filter className="h-5 w-5 text-slate-500" aria-hidden="true" />
-              </div>
-              <div className="mt-4">
-                <ModeButtons config={config} mode={mode} setMode={setMode} tone="slate" disabled={Boolean(state.pendingAction)} />
-              </div>
-              <label htmlFor="opsRadar-source" className="mt-5 block text-sm font-semibold">
-                {config.inputLabel}
-              </label>
-              <textarea
-                id="opsRadar-source"
-                value={sourceText}
-                onChange={(event) => setSourceText(event.target.value)}
-                className="mt-2 min-h-40 w-full resize-y border border-slate-400 bg-white p-3 text-sm leading-6 outline-none focus:border-[#173f61]"
-              />
-              <div className="mt-4 flex flex-wrap gap-2">
-                <PrimaryActionButton
-                  label={state.pendingAction === config.primaryAction ? "처리 중" : config.primaryAction}
-                  onClick={state.runPrimaryAction}
-                  tone="blue"
-                  disabled={Boolean(state.pendingAction)}
-                />
-                <SecondaryActionButton
-                  label={state.pendingAction === config.secondaryAction ? "저장 중" : config.secondaryAction}
-                  onClick={state.runSecondaryAction}
-                  tone="blue"
-                  disabled={Boolean(state.pendingAction)}
-                />
-              </div>
-              {state.error ? <p className="mt-3 text-sm font-semibold text-red-700">{state.error}</p> : null}
-            </section>
-
-            <section
-              data-testid="demo-result-panel"
-              className="border border-slate-400 bg-white"
-            >
-              <div className="flex items-start justify-between gap-3 border-b border-slate-300 bg-slate-100 px-4 py-3">
-                <div>
-                  <p className="text-sm font-semibold text-[#173f61]">분석 결과</p>
-                  <h2 className="mt-1 text-xl font-semibold tracking-normal text-slate-950">
-                    {state.result.title}
-                  </h2>
-                </div>
-                <span className="border border-slate-400 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700">
-                  {state.copied ? "저장됨" : state.pendingAction || "검토대기"}
-                </span>
-              </div>
-              <p className="px-4 py-3 text-sm leading-6 text-slate-700">{state.generatedLead}</p>
-              <div className="grid border-t border-slate-300 md:grid-cols-2">
-                {state.result.sections.map((section) => (
-                  <div key={section.label} className="border-b border-slate-300 p-4 md:border-r md:last:border-r-0">
-                    <h3 className="text-sm font-semibold text-slate-950">{section.label}</h3>
-                    <p className="mt-2 text-sm leading-6 text-slate-700">{section.body}</p>
-                  </div>
-                ))}
-              </div>
-            </section>
-          </div>
-
-          <div className="grid gap-5 lg:grid-cols-[1.2fr_0.8fr]">
-            <section className="border border-slate-400 bg-white p-4">
-              <div className="flex items-center gap-2 text-sm font-semibold text-[#173f61]">
-                <LayoutDashboard className="h-4 w-4" aria-hidden="true" />
-                선행조건 노드
-              </div>
-              <div className="mt-3 divide-y divide-slate-300 border border-slate-300">
-                {state.result.workItems.map((item) => (
-                  <div key={item.title} className="flex items-center justify-between gap-3 px-3 py-2">
-                    <div>
-                      <p className="text-sm font-semibold text-slate-950">{item.title}</p>
-                      <p className="mt-1 text-xs text-slate-500">
-                        {item.owner} / {item.status}
-                      </p>
-                    </div>
-                    <span className={`px-2 py-1 text-xs font-semibold ${riskTone[item.risk]}`}>
-                      {riskLabel[item.risk]}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </section>
-
-            <section
-              data-testid="saved-service-panel"
-              className="border border-slate-400 bg-white p-4"
-            >
-              <div className="flex items-center gap-2 text-sm font-semibold text-[#173f61]">
-                <Save className="h-4 w-4" aria-hidden="true" />
-                저장 상태
-              </div>
-              <div className="mt-4 border border-slate-300 bg-slate-50 px-4 py-3">
-                <p className="text-sm font-semibold text-slate-950">{config.savedTitle}</p>
-                <p className="mt-2 text-sm leading-6 text-slate-700">
-                  저장된 시연 항목 {state.savedCount}건. 공개 데모 저장소에 실제로 보관된다.
-                </p>
-                <SavedArtifactList artifacts={state.savedArtifacts} />
-              </div>
-              <div className="mt-4 grid grid-cols-[auto_1fr] gap-3 text-sm text-slate-700">
-                <GitBranch className="h-4 w-4 text-[#173f61]" aria-hidden="true" />
-                <span>선행노드 미리보기</span>
-                <Archive className="h-4 w-4 text-[#173f61]" aria-hidden="true" />
-                <span>보고 초안 보관</span>
-                <FileCheck2 className="h-4 w-4 text-[#173f61]" aria-hidden="true" />
-                <span>별첨 증빙 화면</span>
-              </div>
-            </section>
-          </div>
-        </section>
+    <section data-testid="admin-guide-panel" className="border border-slate-400 bg-white p-5">
+      <div className="flex items-center gap-2 text-lg font-semibold">
+        <BookOpen className="h-5 w-5 text-[#174f86]" aria-hidden="true" />
+        작성안내
       </div>
-    </main>
+      <p className="mt-2 text-sm leading-6 text-slate-600">
+        왼쪽 메뉴에서 만들 문서 종류를 고르면 입력창과 결과 형식이 그 종류에 맞게 바뀝니다.
+      </p>
+      <dl className="mt-4 grid gap-3 sm:grid-cols-3">
+        {(Object.keys(ADMIN_GENERATION_COPY) as AdminGenerationMode[]).map((key) => (
+          <div key={key} className="border border-slate-300 bg-slate-50 p-3">
+            <dt className="text-sm font-semibold text-[#174f86]">
+              {ADMIN_NAV_ITEMS.find((item) => item.id === key)?.label}
+            </dt>
+            <dd className="mt-1 text-xs leading-5 text-slate-600">{ADMIN_GENERATION_COPY[key].helper}</dd>
+          </div>
+        ))}
+      </dl>
+    </section>
   );
 }
 
+function AdminGenerationPanel({
+  state,
+  adminView,
+}: {
+  state: DemoState;
+  adminView: AdminGenerationMode;
+}) {
+  const { config, sourceText, setSourceText } = state;
+  const copy = ADMIN_GENERATION_COPY[adminView];
+
+  return (
+    <div data-testid="admin-generation-panel" className="grid gap-5 xl:grid-cols-[0.95fr_1.05fr]">
+      <section className="min-w-0 border border-slate-400 bg-white p-5">
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-semibold">문서작성 입력</h2>
+          <FileSearch className="h-5 w-5 text-[#174f86]" aria-hidden="true" />
+        </div>
+        <p className="mt-2 text-sm leading-6 text-slate-600">{copy.helper}</p>
+        <label htmlFor="adminDoc-example" className="mt-5 block text-sm font-semibold">예시 입력</label>
+        <select
+          id="adminDoc-example"
+          aria-label="예시 입력"
+          value={state.selectedExampleId}
+          onChange={(event) => state.selectExample(event.target.value)}
+          className="mt-2 h-10 w-full border border-slate-400 bg-white px-3 text-sm"
+        >
+          {state.examples.map((example) => (
+            <option key={example.id} value={example.id}>{example.label}</option>
+          ))}
+        </select>
+        <label htmlFor="adminDoc-source" className="mt-5 block text-sm font-semibold">
+          {config.inputLabel}
+        </label>
+        <textarea
+          id="adminDoc-source"
+          value={sourceText}
+          onChange={(event) => setSourceText(event.target.value)}
+          className="mt-2 min-h-44 w-full resize-y border border-slate-400 bg-white p-3 text-sm leading-6 outline-none focus:border-[#174f86]"
+        />
+        <p className="mt-2 text-xs leading-5 text-amber-700">
+          입력은 Gemini로 전송됩니다. 실제 개인정보·군번·좌표·작전정보는 입력하지 마세요. 탐지 시 전송을 차단합니다.
+        </p>
+        <div className="mt-4 grid grid-cols-2 gap-2 text-xs text-slate-600">
+          <span className="border border-slate-300 bg-slate-50 px-3 py-2">단어 {state.sourceWordCount}</span>
+          <span className="border border-slate-300 bg-slate-50 px-3 py-2">{state.hasResult ? generationLabel(state.result.model) : "생성 전"}</span>
+        </div>
+        <p className="mt-4 text-xs font-semibold text-[#174f86]">{copy.ctaHint}</p>
+        <div className="mt-2 flex flex-wrap gap-2" {...publicDemoTourTarget("admin-doc-generate")}>
+          <PrimaryActionButton
+            label={state.pendingAction === config.primaryAction ? "작성 중" : config.primaryAction}
+            onClick={state.runPrimaryAction}
+            tone="blue"
+            disabled={Boolean(state.pendingAction)}
+          />
+          <SecondaryActionButton
+            label={state.pendingAction === config.secondaryAction ? "처리 중" : config.secondaryAction}
+            onClick={state.runSecondaryAction}
+            tone="blue"
+            disabled={Boolean(state.pendingAction) || !state.hasResult}
+          />
+        </div>
+        {state.error ? <p className="mt-3 text-sm font-semibold text-red-700">{state.error}</p> : null}
+      </section>
+
+      {!state.hasResult ? (
+        <section className="border border-dashed border-slate-400 bg-slate-50 p-5 text-sm text-slate-600">
+          문서를 작성하면 {copy.resultLabel}가 여기에 표시됩니다.
+        </section>
+      ) : null}
+      <TypewrittenDemoResult state={state}>
+        {(visibleResult, complete, skip) => <article
+          data-testid="demo-result-panel"
+          hidden={!state.hasResult}
+          className="border border-slate-400 bg-white p-5"
+          {...publicDemoTourTarget("admin-doc-result")}
+        >
+          <div className="flex items-start justify-between gap-3 border-b border-slate-200 pb-4">
+            <div>
+              <p className="text-sm font-semibold text-[#174f86]">{copy.resultLabel}</p>
+              <h2 className="mt-2 text-xl font-semibold tracking-normal">{visibleResult.title}</h2>
+              <p className="mt-1 text-xs text-slate-500">{generationLabel(state.result.model)}</p>
+            </div>
+            <span className="border border-slate-300 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700">
+              {state.copied ? "복사/저장됨" : state.pendingAction || "작성중"}
+            </span>
+          </div>
+          <p className="mt-4 text-sm leading-6 text-slate-700">{visibleResult.summary}</p>
+          <div className="mt-5 space-y-4">
+            {visibleResult.sections.map((section, index) => (
+              <ResultSectionBlock key={`${state.result.sections[index]?.label}-${index}`} section={section} />
+            ))}
+          </div>
+          {!complete && /^gemini(?:-|$)/i.test(state.result.model) ? <button type="button" onClick={skip} className="mt-4 text-xs font-semibold text-[#174f86] underline">결과 바로 보기</button> : null}
+        </article>}
+      </TypewrittenDemoResult>
+    </div>
+  );
+}
+
+function AdminDraftsPanel({
+  artifacts,
+  savedTitle,
+}: {
+  artifacts: SavedDemoArtifact[];
+  savedTitle: string;
+}) {
+  return (
+    <section data-testid="admin-drafts-panel" className="border border-slate-400 bg-white p-5">
+      <div className="flex items-center gap-2 text-lg font-semibold">
+        <FolderOpen className="h-5 w-5 text-[#174f86]" aria-hidden="true" />
+        나의 임시문서
+      </div>
+      <p className="mt-2 text-sm leading-6 text-slate-600">
+        {savedTitle} 등 저장된 항목 {artifacts.length}건입니다. 요지 복사를 누르면 여기에 새 항목이 추가됩니다.
+      </p>
+      {artifacts.length === 0 ? (
+        <p className="mt-4 text-sm leading-6 text-slate-500">아직 저장된 임시문서가 없습니다.</p>
+      ) : (
+        <ul className="mt-4 space-y-2">
+          {artifacts.map((artifact) => (
+            <li key={artifact.id} className="border border-slate-300 bg-slate-50 p-3">
+              <p className="text-sm font-semibold text-slate-900">{artifact.title}</p>
+              <p className="mt-1 text-xs text-slate-500">
+                {new Date(artifact.createdAt).toLocaleString("ko-KR")}
+              </p>
+              <p className="mt-2 text-sm leading-6 text-slate-700">{artifact.summary}</p>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+function isAdminGenerationView(view: AdminView): view is AdminGenerationMode {
+  return view === "report" || view === "approval" || view === "security";
+}
+
 function AdminDocumentPortal({ state }: { state: DemoState }) {
-  const { config, mode, setMode, sourceText, setSourceText } = state;
+  const { config } = state;
+  const [adminView, setAdminView] = useState<AdminView>("report");
+
+  function selectAdminView(view: AdminView) {
+    if (view === "report" || view === "approval" || view === "security") {
+      state.setMode(view);
+    } else {
+      state.cancelPending();
+    }
+    setAdminView(view);
+  }
 
   return (
     <main className="min-h-screen bg-[#eef2f5] text-slate-950">
@@ -836,17 +842,20 @@ function AdminDocumentPortal({ state }: { state: DemoState }) {
           <div className="border-b border-slate-300 bg-[#174f86] px-4 py-3 text-sm font-semibold text-white">
             행정서비스
           </div>
-          <div className="divide-y divide-slate-100 text-sm">
-            {["작성안내", "보고서식", "결재요지", "보안검토", "나의 임시문서"].map((item, index) => (
-              <div
-                key={item}
-                className={`flex items-center justify-between px-4 py-3 ${
-                  index === 1 ? "bg-[#e5eef7] font-semibold text-[#174f86]" : "text-slate-700"
+          <div className="divide-y divide-slate-100 text-sm" {...publicDemoTourTarget("admin-doc-type")}>
+            {ADMIN_NAV_ITEMS.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                aria-pressed={adminView === item.id}
+                onClick={() => selectAdminView(item.id)}
+                className={`flex w-full items-center justify-between px-4 py-3 text-left transition ${
+                  adminView === item.id ? "bg-[#e5eef7] font-semibold text-[#174f86]" : "text-slate-700 hover:bg-slate-50"
                 }`}
               >
-                <span>{item}</span>
+                <span>{item.label}</span>
                 <ChevronRight className="h-4 w-4" aria-hidden="true" />
-              </div>
+              </button>
             ))}
           </div>
           <div className="p-4">
@@ -875,66 +884,11 @@ function AdminDocumentPortal({ state }: { state: DemoState }) {
             ))}
           </div>
 
-          <div className="grid gap-5 xl:grid-cols-[0.95fr_1.05fr]">
-            <section className="min-w-0 border border-slate-400 bg-white p-5">
-              <div className="flex items-center justify-between">
-                <h2 className="text-lg font-semibold">문서작성 입력</h2>
-                <FileSearch className="h-5 w-5 text-[#174f86]" aria-hidden="true" />
-              </div>
-              <div className="mt-4">
-                <ModeButtons config={config} mode={mode} setMode={setMode} tone="blue" disabled={Boolean(state.pendingAction)} />
-              </div>
-              <label htmlFor="adminDoc-source" className="mt-5 block text-sm font-semibold">
-                {config.inputLabel}
-              </label>
-              <textarea
-                id="adminDoc-source"
-                value={sourceText}
-                onChange={(event) => setSourceText(event.target.value)}
-                className="mt-2 min-h-44 w-full resize-y border border-slate-400 bg-white p-3 text-sm leading-6 outline-none focus:border-[#174f86]"
-              />
-              <div className="mt-4 grid grid-cols-2 gap-2 text-xs text-slate-600">
-                <span className="border border-slate-300 bg-slate-50 px-3 py-2">단어 {state.sourceWordCount}</span>
-                <span className="border border-slate-300 bg-slate-50 px-3 py-2">{state.result.model}</span>
-              </div>
-              <div className="mt-4 flex flex-wrap gap-2">
-                <PrimaryActionButton
-                  label={state.pendingAction === config.primaryAction ? "작성 중" : config.primaryAction}
-                  onClick={state.runPrimaryAction}
-                  tone="blue"
-                  disabled={Boolean(state.pendingAction)}
-                />
-                <SecondaryActionButton
-                  label={state.pendingAction === config.secondaryAction ? "처리 중" : config.secondaryAction}
-                  onClick={state.runSecondaryAction}
-                  tone="blue"
-                  disabled={Boolean(state.pendingAction)}
-                />
-              </div>
-              {state.error ? <p className="mt-3 text-sm font-semibold text-red-700">{state.error}</p> : null}
-            </section>
-
-            <article
-              data-testid="demo-result-panel"
-              className="border border-slate-400 bg-white p-5"
-            >
-              <div className="flex items-start justify-between gap-3 border-b border-slate-200 pb-4">
-                <div>
-                  <p className="text-sm font-semibold text-[#174f86]">전자문서 미리보기</p>
-                  <h2 className="mt-2 text-xl font-semibold tracking-normal">{state.result.title}</h2>
-                </div>
-                <span className="border border-slate-300 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700">
-                  {state.copied ? "복사/저장됨" : state.pendingAction || "작성중"}
-                </span>
-              </div>
-              <p className="mt-4 text-sm leading-6 text-slate-700">{state.generatedLead}</p>
-              <div className="mt-5 space-y-4">
-                {state.result.sections.map((section) => (
-                  <ResultSectionBlock key={section.label} section={section} />
-                ))}
-              </div>
-            </article>
-          </div>
+          {adminView === "guide" ? <AdminGuidePanel /> : null}
+          {isAdminGenerationView(adminView) ? <AdminGenerationPanel state={state} adminView={adminView} /> : null}
+          {adminView === "drafts" ? (
+            <AdminDraftsPanel artifacts={state.savedArtifacts} savedTitle={config.savedTitle} />
+          ) : null}
 
           <div className="grid gap-5 lg:grid-cols-[1fr_320px]">
             <section className="min-w-0 border border-slate-400 bg-white p-5">
@@ -994,8 +948,80 @@ function AdminDocumentPortal({ state }: { state: DemoState }) {
   );
 }
 
+type AfterActionMode = "aar" | "weekly" | "actions";
+
+const AFTER_ACTION_COPY: Record<AfterActionMode, { description: string; inputHint: string; cta: string }> = {
+  aar: {
+    description: "회의록과 훈련 사후검토 메모에서 유지할 점과 개선할 점을 분리해 정리합니다.",
+    inputHint: "회의록과 훈련 사후검토 메모를 입력하세요.",
+    cta: "요약 생성",
+  },
+  weekly: {
+    description: "이번 주 완료·진행 현황과 차주 계획을 주간상황보고 형식으로 정리합니다.",
+    inputHint: "이번 주 진행 상황과 차주 계획이 담긴 메모를 입력하세요.",
+    cta: "주간보고 생성",
+  },
+  actions: {
+    description: "조치사항마다 담당 부서와 마감일을 정리해 추적 목록을 만듭니다.",
+    inputHint: "담당자와 마감일이 포함된 조치사항 메모를 입력하세요.",
+    cta: "조치 목록 생성",
+  },
+};
+
+function afterActionCopyForMode(mode: string): (typeof AFTER_ACTION_COPY)[AfterActionMode] {
+  return AFTER_ACTION_COPY[mode as AfterActionMode] ?? AFTER_ACTION_COPY.aar;
+}
+
+function AfterActionResultSections({ mode, sections }: { mode: string; sections: ResultSection[] }) {
+  if (mode === "weekly") {
+    return (
+      <div className="mt-5 space-y-3">
+        {sections.map((section, index) => (
+          <div
+            key={index}
+            className={`border p-3 ${
+              section.label.includes("차주") ? "border-amber-400 bg-amber-50" : "border-slate-300 bg-white"
+            }`}
+          >
+            <h3 className="text-sm font-semibold text-slate-950">{section.label}</h3>
+            <p className="mt-1 text-sm leading-6 text-slate-700">{section.body}</p>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  if (mode === "actions") {
+    return (
+      <div className="mt-5 grid gap-3 sm:grid-cols-2">
+        {sections.map((section, index) => (
+          <div key={index} className="border border-slate-300 bg-white p-3">
+            <h3 className="text-sm font-semibold text-slate-950">{section.label}</h3>
+            <p className="mt-1 text-sm leading-6 text-slate-700">{section.body}</p>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-5 border border-slate-300">
+      {sections.map((section, index) => (
+        <section
+          key={index}
+          className="grid border-t border-slate-300 first:border-t-0 md:grid-cols-[160px_1fr]"
+        >
+          <h3 className="bg-slate-50 px-3 py-3 text-sm font-semibold text-slate-950">{section.label}</h3>
+          <p className="px-3 py-3 text-sm leading-6 text-slate-700">{section.body}</p>
+        </section>
+      ))}
+    </div>
+  );
+}
+
 function AfterActionBoard({ state }: { state: DemoState }) {
   const { config, mode, setMode, sourceText, setSourceText } = state;
+  const modeCopy = afterActionCopyForMode(mode);
 
   return (
     <main className="min-h-screen bg-[#edf3f0] text-slate-950">
@@ -1085,21 +1111,42 @@ function AfterActionBoard({ state }: { state: DemoState }) {
                   <p className="mt-1 text-sm text-slate-600">회의록과 훈련 사후검토를 주간보고 항목으로 정리합니다.</p>
                 </div>
                 <div className="w-full md:w-80">
-                  <ModeButtons config={config} mode={mode} setMode={setMode} tone="slate" disabled={Boolean(state.pendingAction)} />
+                  <ModeButtons config={config} mode={mode} setMode={setMode} tone="slate" />
                 </div>
               </div>
-              <label htmlFor="afterAction-source" className="mt-5 block text-sm font-semibold">
-                {config.inputLabel}
-              </label>
-              <textarea
-                id="afterAction-source"
-                value={sourceText}
-                onChange={(event) => setSourceText(event.target.value)}
-                className="mt-2 min-h-32 w-full resize-y border border-slate-400 bg-white p-3 text-sm leading-6 outline-none focus:border-[#15523d]"
-              />
-              <div className="mt-4 flex flex-wrap gap-2">
+              <p data-testid="after-action-mode-description" className="mt-3 text-sm leading-6 text-slate-600">
+                {modeCopy.description}
+              </p>
+              <div {...publicDemoTourTarget("after-action-source")}>
+                <label htmlFor="afterAction-example" className="mt-5 block text-sm font-semibold">예시 입력</label>
+                <select
+                  id="afterAction-example"
+                  aria-label="예시 입력"
+                  value={state.selectedExampleId}
+                  onChange={(event) => state.selectExample(event.target.value)}
+                  className="mt-2 h-10 w-full border border-slate-400 bg-white px-3 text-sm"
+                >
+                  {state.examples.map((example) => (
+                    <option key={example.id} value={example.id}>{example.label}</option>
+                  ))}
+                </select>
+                <label htmlFor="afterAction-source" className="mt-5 block text-sm font-semibold">
+                  {config.inputLabel}
+                </label>
+                <p className="mt-1 text-xs leading-5 text-slate-500">{modeCopy.inputHint}</p>
+                <textarea
+                  id="afterAction-source"
+                  value={sourceText}
+                  onChange={(event) => setSourceText(event.target.value)}
+                  className="mt-2 min-h-32 w-full resize-y border border-slate-400 bg-white p-3 text-sm leading-6 outline-none focus:border-[#15523d]"
+                />
+                <p className="mt-2 text-xs leading-5 text-amber-700">
+                  입력은 Gemini로 전송됩니다. 실제 개인정보·군번·좌표·작전정보는 입력하지 마세요. 탐지 시 전송을 차단합니다.
+                </p>
+              </div>
+              <div className="mt-4 flex flex-wrap gap-2" {...publicDemoTourTarget("after-action-generate")}>
                 <PrimaryActionButton
-                  label={state.pendingAction === config.primaryAction ? "생성 중" : config.primaryAction}
+                  label={state.pendingAction === config.primaryAction ? "생성 중" : modeCopy.cta}
                   onClick={state.runPrimaryAction}
                   tone="green"
                   disabled={Boolean(state.pendingAction)}
@@ -1108,36 +1155,59 @@ function AfterActionBoard({ state }: { state: DemoState }) {
                   label={state.pendingAction === config.secondaryAction ? "내보내는 중" : config.secondaryAction}
                   onClick={state.runSecondaryAction}
                   tone="green"
-                  disabled={Boolean(state.pendingAction)}
+                  disabled={Boolean(state.pendingAction) || !state.hasResult}
                 />
               </div>
               {state.error ? <p className="mt-3 text-sm font-semibold text-red-700">{state.error}</p> : null}
             </section>
 
-            <article
-              data-testid="demo-result-panel"
-              className="min-w-0 border border-slate-400 bg-white p-5"
-            >
-              <div className="flex flex-col gap-3 border-b border-slate-200 pb-4 md:flex-row md:items-start md:justify-between">
-                <div>
-                  <p className="text-sm font-semibold text-[#15523d]">보고자료 상세보기</p>
-                  <h2 className="mt-2 text-xl font-semibold tracking-normal">{state.result.title}</h2>
+            {!state.hasResult ? (
+              <section className="min-w-0 border border-dashed border-slate-400 bg-slate-50 p-5 text-sm text-slate-600">
+                요약을 생성하면 보고자료 상세보기가 여기에 표시됩니다.
+              </section>
+            ) : null}
+            <TypewrittenDemoResult state={state}>
+              {(visibleResult, complete, skip) => <article
+                data-testid="demo-result-panel"
+                hidden={!state.hasResult}
+                className="min-w-0 border border-slate-400 bg-white p-5"
+                {...publicDemoTourTarget("after-action-result")}
+              >
+                <div className="flex flex-col gap-3 border-b border-slate-200 pb-4 md:flex-row md:items-start md:justify-between">
+                  <div>
+                    <p className="text-sm font-semibold text-[#15523d]">보고자료 상세보기</p>
+                    <h2 className="mt-2 text-xl font-semibold tracking-normal">{visibleResult.title}</h2>
+                    <p className="mt-1 text-xs text-slate-500">{generationLabel(state.result.model)}</p>
+                  </div>
+                  <div className="flex items-center gap-2 border border-slate-300 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700">
+                    <Clock3 className="h-4 w-4" aria-hidden="true" />
+                    {state.copied ? "내보냄/저장됨" : state.pendingAction || "검토대기"}
+                  </div>
                 </div>
-                <div className="flex items-center gap-2 border border-slate-300 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700">
-                  <Clock3 className="h-4 w-4" aria-hidden="true" />
-                  {state.copied ? "내보냄/저장됨" : state.pendingAction || "검토대기"}
-                </div>
-              </div>
-              <p className="mt-4 text-sm leading-6 text-slate-700">{state.generatedLead}</p>
-              <div className="mt-5 border border-slate-300">
-                {state.result.sections.map((section) => (
-                  <section key={section.label} className="grid border-t border-slate-300 first:border-t-0 md:grid-cols-[160px_1fr]">
-                    <h3 className="bg-slate-50 px-3 py-3 text-sm font-semibold text-slate-950">{section.label}</h3>
-                    <p className="px-3 py-3 text-sm leading-6 text-slate-700">{section.body}</p>
-                  </section>
-                ))}
-              </div>
-            </article>
+                <p className="mt-4 text-sm leading-6 text-slate-700">{visibleResult.summary}</p>
+                {mode === "actions" && visibleResult.workItems.length > 0 ? (
+                  <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                    {visibleResult.workItems.map((item, index) => (
+                      <div
+                        key={`${state.result.workItems[index]?.title}-${index}`}
+                        className="flex items-center justify-between border border-slate-300 bg-white px-3 py-2 text-sm"
+                      >
+                        <div>
+                          <p className="font-medium">{item.title}</p>
+                          <p className="mt-1 text-xs text-slate-500">담당: {item.owner}</p>
+                          {item.dueDate ? <p className="mt-1 text-xs text-slate-500">마감: {item.dueDate}</p> : null}
+                        </div>
+                        <span className={`px-2 py-1 text-xs font-semibold ${riskTone[item.risk]}`}>
+                          {riskLabel[item.risk]}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+                <AfterActionResultSections mode={mode} sections={visibleResult.sections} />
+                {!complete && /^gemini(?:-|$)/i.test(state.result.model) ? <button type="button" onClick={skip} className="mt-4 text-xs font-semibold text-[#15523d] underline">결과 바로 보기</button> : null}
+              </article>}
+            </TypewrittenDemoResult>
 
             <section className="min-w-0 border border-slate-400 bg-white p-5">
               <div className="flex items-center gap-2 text-base font-semibold">
@@ -1145,20 +1215,22 @@ function AfterActionBoard({ state }: { state: DemoState }) {
                 조치사항 목록
               </div>
               <div className="mt-4 overflow-x-auto border border-slate-300">
-                <div className="min-w-[620px]">
-                  <div className="grid grid-cols-[minmax(240px,1fr)_140px_100px_100px] bg-slate-100 px-4 py-3 text-sm font-semibold text-slate-700">
+                <div className="min-w-[720px]">
+                  <div className="grid grid-cols-[minmax(240px,1fr)_140px_110px_100px_100px] bg-slate-100 px-4 py-3 text-sm font-semibold text-slate-700">
                     <span>조치사항</span>
                     <span>담당부서</span>
+                    <span>마감일</span>
                     <span>상태</span>
                     <span>위험도</span>
                   </div>
                   {state.result.workItems.map((item) => (
                     <div
                       key={item.title}
-                      className="grid grid-cols-[minmax(240px,1fr)_140px_100px_100px] border-t border-slate-200 px-4 py-3 text-sm"
+                      className="grid grid-cols-[minmax(240px,1fr)_140px_110px_100px_100px] border-t border-slate-200 px-4 py-3 text-sm"
                     >
                       <span className="font-medium">{item.title}</span>
                       <span className="text-slate-600">{item.owner}</span>
+                      <span className="text-slate-600">{item.dueDate || "-"}</span>
                       <span className="text-slate-600">{item.status}</span>
                       <span className={`w-fit px-2 py-1 text-xs font-semibold ${riskTone[item.risk]}`}>
                         {riskLabel[item.risk]}

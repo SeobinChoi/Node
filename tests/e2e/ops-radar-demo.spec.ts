@@ -1,4 +1,10 @@
 import { expect, test } from "@playwright/test";
+
+const DISMISSED_TOUR = JSON.stringify({ status: "dismissed", pageIndex: 0, stepIndex: 0, direction: "forward" });
+
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript((value) => sessionStorage.setItem("node-public-demo-tour-v1", value), DISMISSED_TOUR);
+});
 import { readFile } from "node:fs/promises";
 
 test("runs the no-login Ops Radar sample flow and safely resets", async ({ page }) => {
@@ -209,6 +215,16 @@ test("re-evaluates the graph when the operator edits the current task", async ({
   await expect(page.getByTestId("ops-task-checklist")).toContainText("완료");
 });
 
+test("report document type changes its preview before generation", async ({ page }) => {
+  await page.goto("/ops-radar-demo");
+  await page.getByRole("button", { name: "업무 평가 실행" }).click();
+  await expect(page.getByTestId("ops-document-preview")).toContainText("지휘 판단");
+  await page.getByTestId("ops-document-type").selectOption("action");
+  await expect(page.getByTestId("ops-document-preview")).toContainText("담당");
+  await page.getByTestId("ops-document-type").selectOption("weekly");
+  await expect(page.getByTestId("ops-document-preview")).toContainText("차주");
+});
+
 test("generates the selected report type from the current source and labels the origin", async ({ page }) => {
   const payloads: Array<Record<string, string>> = [];
   await page.route("**/api/demo/generate", async (route) => {
@@ -266,6 +282,25 @@ test("generates the selected report type from the current source and labels the 
   expect(payloads[0].sourceText).not.toContain("현장 대응반");
   await page.getByTestId("ops-document-type").selectOption("weekly");
   await expect(page.getByTestId("ops-ai-title")).toHaveCount(0);
+});
+
+test("restarts typing when Ops Radar regenerates identical Gemini text", async ({ page }) => {
+  const result = {
+    title: "동일한 보고문 제목",
+    summary: "동일한 Gemini 보고문도 재생성할 때 다시 작성되는 모습을 보여준다. " + "재생성 확인 ".repeat(80),
+    sections: [{ label: "현재 상황", body: "동일한 본문" }],
+    actions: ["동일한 조치"],
+    model: "gemini-test",
+  };
+  await page.route("**/api/demo/generate", (route) => route.fulfill({ json: { ok: true, result } }));
+  await page.goto("/ops-radar-demo");
+  await page.getByRole("button", { name: "업무 평가 실행" }).click();
+  await page.getByTestId("ops-generate-document").click();
+  await page.getByRole("button", { name: "결과 바로 보기" }).click();
+  await expect(page.getByTestId("ops-ai-summary")).toHaveText(result.summary);
+  await page.getByTestId("ops-generate-document").click();
+  await expect(page.getByTestId("ops-ai-summary")).not.toHaveText(result.summary);
+  await expect(page.getByRole("button", { name: "결과 바로 보기" })).toBeVisible();
 });
 
 test("marks deterministic fallback output and surfaces generation failures", async ({ page }) => {
