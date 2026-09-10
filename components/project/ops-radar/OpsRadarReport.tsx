@@ -158,7 +158,7 @@ export function OpsRadarReport({ result, tasks, scenarioTitle }: { result: Evalu
     <div data-testid="ops-ai-report" className="mt-5 border-t border-slate-200 pt-4">
       <h3 className="font-semibold text-slate-900">보고문 생성</h3>
       <p className="mt-1 text-sm text-slate-600">현재 화면의 업무·선후행·병목 내용을 그대로 보고 문안으로 정리합니다.</p>
-      <p data-testid="ops-ai-warning" className="mt-2 rounded border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-950">비식별 합성 데이터 시연입니다. 실제 부대명·인명·좌표 등 민감정보는 입력하지 마세요.</p>
+      <p data-testid="ops-ai-warning" className="mt-2 rounded border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-950">비식별 합성 데이터 시연입니다. 입력은 Gemini로 전송됩니다. 실제 부대명·인명·좌표 등 민감정보는 입력하지 마세요. 탐지 시 전송을 차단합니다.</p>
       <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-end">
         <div className="w-full sm:w-72">
           <label className="block text-xs font-medium text-slate-700" htmlFor="ops-document-type">보고서 유형</label>

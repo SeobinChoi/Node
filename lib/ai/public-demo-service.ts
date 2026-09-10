@@ -381,6 +381,7 @@ function opsRadarDeterministicFallback({ mode, sourceText }: { mode: string; sou
 }
 
 export class PublicDemoGenerationError extends Error {}
+export class PublicDemoSensitiveInputError extends Error {}
 
 const SectionShapeSchema = z.object({
     heading: z.string().optional(),
@@ -562,6 +563,12 @@ export async function generatePublicDemoResult({
 }): Promise<PublicDemoResult> {
     const resolvedTool = resolveTool(service, tool, mode);
     const isOpsRadar = resolvedTool === "opsRadarReport";
+    const localFlags = scanMilitarySensitiveContent([sourceText]);
+    const isCatalogExample = Boolean(exampleId && isUnmodifiedExample(exampleId, sourceText));
+
+    if (localFlags.length > 0 && !isCatalogExample) {
+        throw new PublicDemoSensitiveInputError("실제 민감정보로 보이는 입력은 외부 AI로 전송하지 않습니다. 비식별 합성 데이터로 바꿔 주세요.");
+    }
 
     let effectiveGenerated: Record<string, unknown>;
     let effectiveModel: string;
@@ -624,7 +631,6 @@ export async function generatePublicDemoResult({
         ? securitySectionsFromGenerated(effectiveGenerated)
         : sectionsFromGenerated(effectiveGenerated);
     const resolvedSections = sections.length > 0 ? sections : [{ label: "요약", body: summary }];
-    const localFlags = scanMilitarySensitiveContent([sourceText]);
     const partial: Omit<PublicDemoResult, "markdown"> = {
         title,
         summary,

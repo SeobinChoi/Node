@@ -4,10 +4,10 @@ import { exampleById } from "@/lib/demo/public-document-examples";
 const generateMilitaryAIJson = vi.fn();
 
 vi.mock("@/lib/db/prisma", () => ({ prisma: {} }));
-vi.mock("@/lib/ai/military-documents", () => ({
-  generateMilitaryAIJson: (...args: unknown[]) => generateMilitaryAIJson(...args),
-  scanMilitarySensitiveContent: () => [],
-}));
+vi.mock("@/lib/ai/military-documents", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/ai/military-documents")>();
+  return { ...actual, generateMilitaryAIJson: (...args: unknown[]) => generateMilitaryAIJson(...args) };
+});
 
 const { generatePublicDemoResult } = await import("@/lib/ai/public-demo-service");
 
@@ -210,6 +210,21 @@ describe("metrics are derived from the actual result", () => {
     const actionCountMetric = result.metrics.find((m) => Number(m.value) === result.actions.length);
     expect(sectionCountMetric).toBeDefined();
     expect(actionCountMetric).toBeDefined();
+  });
+});
+
+describe("sensitive input boundary", () => {
+  beforeEach(() => {
+    generateMilitaryAIJson.mockReset();
+  });
+
+  it("blocks detected non-catalog input before Gemini transmission", async () => {
+    await expect(generatePublicDemoResult({
+      service: "militaryAi",
+      tool: "securityScan",
+      sourceText: "실제 좌표 37.12345, 127.12345",
+    })).rejects.toThrow("외부 AI로 전송하지 않습니다");
+    expect(generateMilitaryAIJson).not.toHaveBeenCalled();
   });
 });
 

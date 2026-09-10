@@ -721,6 +721,9 @@ function AdminGenerationPanel({
           onChange={(event) => setSourceText(event.target.value)}
           className="mt-2 min-h-44 w-full resize-y border border-slate-400 bg-white p-3 text-sm leading-6 outline-none focus:border-[#174f86]"
         />
+        <p className="mt-2 text-xs leading-5 text-amber-700">
+          입력은 Gemini로 전송됩니다. 실제 개인정보·군번·좌표·작전정보는 입력하지 마세요. 탐지 시 전송을 차단합니다.
+        </p>
         <div className="mt-4 grid grid-cols-2 gap-2 text-xs text-slate-600">
           <span className="border border-slate-300 bg-slate-50 px-3 py-2">단어 {state.sourceWordCount}</span>
           <span className="border border-slate-300 bg-slate-50 px-3 py-2">{state.hasResult ? generationLabel(state.result.model) : "생성 전"}</span>
@@ -1137,6 +1140,9 @@ function AfterActionBoard({ state }: { state: DemoState }) {
                   onChange={(event) => setSourceText(event.target.value)}
                   className="mt-2 min-h-32 w-full resize-y border border-slate-400 bg-white p-3 text-sm leading-6 outline-none focus:border-[#15523d]"
                 />
+                <p className="mt-2 text-xs leading-5 text-amber-700">
+                  입력은 Gemini로 전송됩니다. 실제 개인정보·군번·좌표·작전정보는 입력하지 마세요. 탐지 시 전송을 차단합니다.
+                </p>
               </div>
               <div className="mt-4 flex flex-wrap gap-2" {...publicDemoTourTarget("after-action-generate")}>
                 <PrimaryActionButton

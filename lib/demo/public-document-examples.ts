@@ -304,7 +304,7 @@ export const PUBLIC_DOCUMENT_EXAMPLES: PublicDocumentExample[] = [
         { label: "원인", body: "동선 표지가 불명확해 8명이 절차 확인을 완료하지 못했다." },
       ],
       actions: [
-        { title: "대피 동선 재설계", owner: "안전관리계장", dueDate: "2026-06-03", risk: "high" },
+        { title: "대피 동선 재설계", owner: "안전관리계장", dueDate: "2026-05-27", risk: "high" },
         { title: "미확인 인원 8명 재교육", owner: "재난대응담당관", dueDate: "2026-05-27", risk: "medium" },
       ],
     },

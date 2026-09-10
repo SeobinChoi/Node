@@ -3,6 +3,7 @@ import { z } from "zod";
 import {
     generatePublicDemoResult,
     normalizeDemoService,
+    PublicDemoSensitiveInputError,
 } from "@/lib/ai/public-demo-service";
 
 const GenerateSchema = z.object({
@@ -82,6 +83,9 @@ export async function POST(req: NextRequest) {
 
         return NextResponse.json({ ok: true, result });
     } catch (error) {
+        if (error instanceof PublicDemoSensitiveInputError) {
+            return NextResponse.json({ error: error.message }, { status: 400 });
+        }
         if (error instanceof PayloadTooLargeError) {
             return NextResponse.json({ error: "입력 내용이 너무 큽니다." }, { status: 413 });
         }

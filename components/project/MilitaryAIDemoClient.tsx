@@ -715,6 +715,9 @@ export function MilitaryAIDemoClient() {
                 onChange={(event) => editSource(event.target.value)}
                 className="mt-2 min-h-56 w-full resize-y rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm leading-6 outline-none transition focus:border-slate-400 focus:bg-white"
               />
+              <p className="mt-2 text-xs leading-5 text-amber-700">
+                입력은 Gemini로 전송됩니다. 실제 개인정보·군번·좌표·작전정보는 입력하지 마세요. 탐지 시 전송을 차단합니다.
+              </p>
             </div>
 
             <div className="mt-4 grid grid-cols-[1fr_1fr_auto] gap-2">

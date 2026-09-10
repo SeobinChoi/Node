@@ -125,6 +125,12 @@ describe("PUBLIC_DOCUMENT_EXAMPLES catalog", () => {
     }
   });
 
+  it("keeps the disaster-response redesign deadline aligned with its source", () => {
+    const example = exampleById("aar-disaster-response-training");
+    expect(example?.sourceText).toContain("2026-05-27까지 동선을 재설계");
+    expect(example?.baselineResult.actions.find((action) => action.title === "대피 동선 재설계")?.dueDate).toBe("2026-05-27");
+  });
+
   it("has a risk or approval-request signal in each sourceText", () => {
     const riskOrApprovalPattern = /위험|리스크|지연\s?우려|승인\s?요청|결재\s?요청/;
     for (const example of PUBLIC_DOCUMENT_EXAMPLES) {
