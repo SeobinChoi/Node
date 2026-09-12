@@ -124,6 +124,7 @@ test("interactive public demo controls do not overflow on mobile", async ({ page
 });
 
 test("first browser session tutorial clicks local demo controls without generating", async ({ browser }) => {
+  test.setTimeout(60_000);
   const context = await browser.newContext();
   const page = await context.newPage();
   const mutatingRequests: string[] = [];
@@ -145,47 +146,55 @@ test("first browser session tutorial clicks local demo controls without generati
   await expect(page.locator('[data-tour-action="meetingSummary"]')).toHaveCount(1);
   await page.getByRole("button", { name: "시작", exact: true }).click();
   await expect(page.getByText("화면 1/4 · 단계 1/3")).toBeVisible();
+  await expect(page.getByTestId("tour-click-indicator")).toBeVisible();
+  await firstAction.focus();
+  await expect(firstAction).toBeFocused();
   await expect(page.getByRole("button", { name: "회의", exact: true })).toHaveAttribute("aria-pressed", "true");
-  await page.getByRole("button", { name: "다음", exact: true }).click();
-  await page.getByRole("button", { name: "다음", exact: true }).click();
-  await expect(page.getByRole("button", { name: "보안", exact: true })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByText("화면 1/4 · 단계 2/3")).toBeVisible({ timeout: 5_000 });
+  await expect(page.getByRole("button", { name: "보안", exact: true })).toHaveAttribute("aria-pressed", "true", { timeout: 5_000 });
   await expect(page.getByRole("button", { name: "보안 검토", exact: true })).toBeAttached();
-  await page.getByRole("button", { name: "다음", exact: true }).click();
 
-  await expect(page).toHaveURL(/\/ops-radar-demo$/);
+  await expect(page).toHaveURL(/\/ops-radar-demo$/, { timeout: 5_000 });
   await expect(page.locator('[data-tour-action="evaluate"]')).toHaveCount(1);
   await expect(page.getByText("화면 2/4 · 단계 1/2")).toBeVisible();
-  await page.getByRole("button", { name: "다음", exact: true }).click();
-  await expect(page.getByText("평가 완료 · 규칙 기반 평가")).toBeAttached();
+  await expect(page.getByText("평가 완료 · 규칙 기반 평가")).toBeAttached({ timeout: 5_000 });
   await expect(page.getByTestId("ops-action-lead")).toContainText("우선 조치");
-  await page.getByRole("button", { name: "다음", exact: true }).click();
 
-  await expect(page).toHaveURL(/\/admin-doc-demo$/);
+  await expect(page).toHaveURL(/\/admin-doc-demo$/, { timeout: 5_000 });
   await expect(page.locator('[data-tour-action="approval"]')).toHaveCount(1);
   await expect(page.locator('[data-tour-action="security"]')).toHaveCount(1);
   await expect(page.getByText("화면 3/4 · 단계 1/2")).toBeVisible();
   await expect(page.getByRole("button", { name: "결재요지", exact: true })).toHaveAttribute("aria-pressed", "true");
-  await page.getByRole("button", { name: "다음", exact: true }).click();
-  await expect(page.getByRole("button", { name: "보안검토", exact: true })).toHaveAttribute("aria-pressed", "true");
-  await page.getByRole("button", { name: "다음", exact: true }).click();
+  await expect(page.getByRole("button", { name: "보안검토", exact: true })).toHaveAttribute("aria-pressed", "true", { timeout: 5_000 });
 
-  await expect(page).toHaveURL(/\/after-action-demo$/);
+  await expect(page).toHaveURL(/\/after-action-demo$/, { timeout: 5_000 });
   await expect(page.locator('[data-tour-action="weekly"]')).toHaveCount(1);
   await expect(page.locator('[data-tour-action="actions"]')).toHaveCount(1);
   await expect(page.getByText("화면 4/4 · 단계 1/2")).toBeVisible();
   await expect(page.getByRole("button", { name: "주간", exact: true })).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByRole("button", { name: "주간보고 생성", exact: true })).toBeAttached();
-  await page.getByRole("button", { name: "다음", exact: true }).click();
-  await expect(page.getByRole("button", { name: "조치", exact: true })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByRole("button", { name: "조치", exact: true })).toHaveAttribute("aria-pressed", "true", { timeout: 5_000 });
   await expect(page.getByRole("button", { name: "조치 목록 생성", exact: true })).toBeAttached();
-  await page.getByRole("button", { name: "완료", exact: true }).click();
 
-  await expect(page.getByText("화면 4/4")).toHaveCount(0);
+  await expect(page.getByText("화면 4/4")).toHaveCount(0, { timeout: 5_000 });
   expect(mutatingRequests).toEqual([]);
   expect(downloads).toBe(0);
   expect(await page.evaluate(() => JSON.parse(sessionStorage.getItem("node-public-demo-tour-v1") ?? "null")?.status)).toBe("completed");
   await page.goto("/military-ai-demo");
   await expect(page.getByRole("heading", { name: "Node 공개 시연에 오신 것을 환영합니다" })).toHaveCount(0);
+  await context.close();
+});
+
+test("automatic tutorial waits for manual navigation with reduced motion", async ({ browser }) => {
+  const context = await browser.newContext({ reducedMotion: "reduce" });
+  const page = await context.newPage();
+  await page.goto("/military-ai-demo");
+  await page.getByRole("button", { name: "시작", exact: true }).click();
+  await expect(page.getByText("화면 1/4 · 단계 1/3")).toBeVisible();
+  await page.waitForTimeout(2_700);
+  await expect(page.getByText("화면 1/4 · 단계 1/3")).toBeVisible();
+  await page.getByRole("button", { name: "다음", exact: true }).click();
+  await expect(page.getByText("화면 1/4 · 단계 2/3")).toBeVisible();
   await context.close();
 });
 
