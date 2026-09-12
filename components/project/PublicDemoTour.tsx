@@ -130,6 +130,8 @@ export function PublicDemoTour({ currentPage }: { currentPage: PublicDemoTourPag
   const [view, setView] = useState<"loading" | "welcome" | "tour" | "closed">("loading");
   const [tourState, setTourState] = useState<PublicDemoTourState | null>(null);
   const [targetRect, setTargetRect] = useState<DOMRect | null>(null);
+  const [clickPoint, setClickPoint] = useState<{ left: number; top: number } | null>(null);
+  const [autoAdvance, setAutoAdvance] = useState(true);
 
   function close(status: "dismissed" | "completed") {
     const state: PublicDemoTourState = {
@@ -142,6 +144,7 @@ export function PublicDemoTour({ currentPage }: { currentPage: PublicDemoTourPag
     setView("closed");
     setTourState(state);
     setTargetRect(null);
+    setClickPoint(null);
   }
 
   function activate(candidate: PublicDemoTourState) {
@@ -163,16 +166,20 @@ export function PublicDemoTour({ currentPage }: { currentPage: PublicDemoTourPag
         const step = page.steps[index];
         const target = document.querySelector<HTMLElement>(`[data-tour-id="${step.targetId}"]`);
         if (!target) continue;
+        target.scrollIntoView({ block: "center", behavior: "auto" });
         if (step.actionId) {
           const action = document.querySelector<HTMLButtonElement>(`button[data-tour-action="${step.actionId}"]`);
           if (!action || action.disabled) return;
+          const actionRect = action.getBoundingClientRect();
+          setClickPoint({ left: actionRect.left + actionRect.width / 2, top: actionRect.top + actionRect.height / 2 });
           action.click();
+        } else {
+          setClickPoint(null);
         }
         const nextState = { status: "active", pageIndex, stepIndex: index, direction } as const;
         writeState(nextState);
         setTourState(nextState);
         setTargetRect(target.getBoundingClientRect());
-        target.scrollIntoView({ block: "center", behavior: "smooth" });
         setView("tour");
         return;
       }
@@ -223,11 +230,15 @@ export function PublicDemoTour({ currentPage }: { currentPage: PublicDemoTourPag
   }, []);
 
   useEffect(() => {
+    setAutoAdvance(!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches);
+  }, []);
+
+  useEffect(() => {
     const dialog = dialogRef.current;
     if (!dialog) return;
     if (view === "welcome" || view === "tour") {
       restoreFocusRef.current ??= document.activeElement as HTMLElement | null;
-      if (!dialog.open) dialog.showModal();
+      if (!dialog.open) dialog.show();
     } else if (dialog.open) {
       dialog.close();
       restoreFocusRef.current?.focus();
@@ -249,6 +260,14 @@ export function PublicDemoTour({ currentPage }: { currentPage: PublicDemoTourPag
       window.removeEventListener("scroll", update, true);
     };
   }, [tourState, view]);
+
+  useEffect(() => {
+    if (view !== "tour" || !tourState || !autoAdvance) return;
+    const timer = window.setTimeout(() => move("forward"), 2_400);
+    return () => window.clearTimeout(timer);
+    // Restart the timer only when the displayed step changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoAdvance, tourState, view]);
 
   const page = tourState ? PUBLIC_DEMO_TOUR_PAGES[tourState.pageIndex] : null;
   const step = page && tourState ? page.steps[tourState.stepIndex] : null;
@@ -276,8 +295,9 @@ export function PublicDemoTour({ currentPage }: { currentPage: PublicDemoTourPag
           event.preventDefault();
           close("dismissed");
         }}
-        className="fixed inset-0 m-0 h-dvh max-h-none w-screen max-w-none overflow-visible bg-transparent p-0 text-slate-900 backdrop:bg-slate-950/45"
+        className="pointer-events-none fixed inset-0 m-0 h-dvh max-h-none w-screen max-w-none overflow-visible bg-transparent p-0 text-slate-900"
       >
+        {(view === "welcome" || view === "tour") && <span aria-hidden="true" className="fixed inset-0 bg-slate-950/20" />}
         {view === "tour" && targetRect && (
           <span
             aria-hidden="true"
@@ -286,8 +306,20 @@ export function PublicDemoTour({ currentPage }: { currentPage: PublicDemoTourPag
           />
         )}
 
+        {view === "tour" && clickPoint && (
+          <span
+            data-testid="tour-click-indicator"
+            aria-hidden="true"
+            className="pointer-events-none fixed z-10 -translate-x-1/2 -translate-y-1/2"
+            style={clickPoint}
+          >
+            <span className="absolute -inset-4 rounded-full border-4 border-red-500 bg-red-200/40 motion-safe:animate-ping" />
+            <span className="relative rounded-full bg-red-600 px-2 py-1 text-xs font-black text-white shadow-lg">클릭</span>
+          </span>
+        )}
+
         {view === "welcome" && (
-          <section className="fixed left-1/2 top-1/2 w-[min(32rem,calc(100%-2rem))] -translate-x-1/2 -translate-y-1/2 border border-slate-300 bg-white p-6 shadow-2xl">
+          <section className="pointer-events-auto fixed left-1/2 top-1/2 w-[min(32rem,calc(100%-2rem))] -translate-x-1/2 -translate-y-1/2 border border-slate-300 bg-white p-6 shadow-2xl">
             <p className="text-sm font-semibold text-blue-700">4개 공개 시연 둘러보기</p>
             <h2 id="public-demo-tour-title" className="mt-2 text-2xl font-bold">Node 공개 시연에 오신 것을 환영합니다</h2>
             <p id="public-demo-tour-description" className="mt-3 text-sm leading-6 text-slate-600">
@@ -303,9 +335,9 @@ export function PublicDemoTour({ currentPage }: { currentPage: PublicDemoTourPag
         {view === "tour" && page && step && tourState && (
           <section
             style={cardStyle}
-            className="fixed bottom-0 left-0 w-full border border-slate-300 bg-white p-5 shadow-2xl [top:auto] sm:bottom-auto sm:w-96 sm:[left:var(--tour-left)] sm:[top:var(--tour-top)]"
+            className="pointer-events-auto fixed bottom-0 left-0 w-full border border-slate-300 bg-white p-5 shadow-2xl [top:auto] sm:bottom-auto sm:w-96 sm:[left:var(--tour-left)] sm:[top:var(--tour-top)]"
           >
-            <p className="text-xs font-semibold text-blue-700">화면 {tourState.pageIndex + 1}/4 · 단계 {tourState.stepIndex + 1}/{page.steps.length}</p>
+            <p className="text-xs font-semibold text-blue-700">{autoAdvance ? "자동 시연 중" : "단계별 시연 중"} · 화면 {tourState.pageIndex + 1}/4 · 단계 {tourState.stepIndex + 1}/{page.steps.length}</p>
             <h2 id="public-demo-tour-title" className="mt-2 text-lg font-bold">{step.title}</h2>
             <p id="public-demo-tour-description" className="mt-2 text-sm leading-6 text-slate-600">{step.description}</p>
             <div className="mt-5 flex items-center justify-between gap-2">
@@ -318,6 +350,9 @@ export function PublicDemoTour({ currentPage }: { currentPage: PublicDemoTourPag
               </div>
             </div>
           </section>
+        )}
+        {view === "tour" && page && step && tourState && (
+          <p className="sr-only" role="status" aria-live="polite">{page.label} 화면 {tourState.stepIndex + 1}단계. {step.title}. {step.description}</p>
         )}
       </dialog>
     </>

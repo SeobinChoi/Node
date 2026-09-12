@@ -126,3 +126,4 @@
 - [x] Complete `/ops-radar-demo`: task add/delete with cycle prevention, shared DB save/reload, and direct validated HWPX download; verify unit, E2E, lint, typecheck, and production build.
 - [x] Change the four-page public tutorial from spotlight-only guidance to real local-control clicks while proving it never calls the generation API.
 - [x] Harden tutorial actions with stable selectors, fail-closed missing-control behavior, and no-mutation/no-download E2E guards.
+- [x] Convert the public-demo tutorial from manual spotlight steps to an automatic visible click walkthrough.
