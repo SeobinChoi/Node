@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
 import {
   AlertTriangle,
   CheckCircle2,
@@ -548,8 +548,19 @@ export function MilitaryAIDemoClient() {
     setSourceText(value);
   };
 
-  const generate = async () => {
+  const generate = async (event: ReactMouseEvent<HTMLButtonElement>) => {
     if (pendingAction) return;
+
+    const tourExample = event.currentTarget.dataset.tourTrigger === "true" ? examplesForTool("meetingSummary")[0] : null;
+    const requestTool = tourExample ? "meetingSummary" : activeToolId;
+    const requestSource = tourExample?.sourceText ?? (sourceText || defaultSource);
+    const requestExampleId = tourExample?.id ?? selectedExampleId;
+    if (tourExample) {
+      clearResult();
+      setActiveToolId("meetingSummary");
+      setSelectedExampleId(tourExample.id);
+      setSourceText(tourExample.sourceText);
+    }
 
     const version = ++requestVersion.current;
     setCopied(false);
@@ -563,9 +574,9 @@ export function MilitaryAIDemoClient() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           service: "militaryAi",
-          tool: activeToolId,
-          sourceText: sourceText || defaultSource,
-          exampleId: selectedExampleId,
+          tool: requestTool,
+          sourceText: requestSource,
+          exampleId: requestExampleId,
         }),
       });
       const body = await response.json();
@@ -725,6 +736,7 @@ export function MilitaryAIDemoClient() {
               <button
                 type="button"
                 data-tour-id="military-ai-generate"
+                data-tour-action="generateAi"
                 onClick={generate}
                 disabled={Boolean(pendingAction)}
                 className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-slate-950 px-3 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60"
@@ -751,7 +763,7 @@ export function MilitaryAIDemoClient() {
                 <RefreshCcw className="h-4 w-4" />
               </button>
             </div>
-            {error ? <p className="mt-3 text-sm font-semibold text-red-700">{error}</p> : null}
+            {error ? <p role="alert" data-tour-ai-error="true" className="mt-3 text-sm font-semibold text-red-700">{error} 생성 버튼을 다시 눌러 재시도할 수 있습니다.</p> : null}
           </aside>
 
           {!hasResult ? (
@@ -770,6 +782,7 @@ export function MilitaryAIDemoClient() {
               return <section
                 data-testid="military-result-panel"
                 data-tour-id="military-ai-output"
+                data-tour-ai-result={hasResult ? "complete" : undefined}
                 hidden={!hasResult}
                 className="rounded-lg border border-slate-200 bg-white p-4"
               >

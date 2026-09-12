@@ -589,7 +589,7 @@ export async function generatePublicDemoResult({
                 noLogin: true,
             },
             temperature: resolvedTool === "securityScan" ? 0.2 : 0.25,
-            maxTokens: 1400,
+            maxTokens: 3_000,
         });
 
         if (isOpsRadar) {
@@ -730,7 +730,6 @@ export async function saveDemoArtifact({
 }
 
 export async function listDemoArtifacts(service?: PublicDemoService, limit = 8): Promise<DemoArtifactSummary[]> {
-    await ensureDemoArtifactTable();
     const boundedLimit = Math.min(Math.max(limit, 1), 20);
     const blockedTitle = "AI response parsing failed";
     const rows = service
