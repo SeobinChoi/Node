@@ -307,6 +307,7 @@ function ModeButtons({
         <button
           key={item.id}
           type="button"
+          data-tour-action={item.id}
           aria-pressed={mode === item.id}
           onClick={() => setMode(item.id)}
           disabled={disabled}
@@ -848,6 +849,7 @@ function AdminDocumentPortal({ state }: { state: DemoState }) {
               <button
                 key={item.id}
                 type="button"
+                data-tour-action={item.id}
                 aria-pressed={adminView === item.id}
                 onClick={() => selectAdminView(item.id)}
                 className={`flex w-full items-center justify-between px-4 py-3 text-left transition ${
