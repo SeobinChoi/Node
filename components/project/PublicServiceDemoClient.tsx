@@ -307,6 +307,7 @@ function ModeButtons({
         <button
           key={item.id}
           type="button"
+          aria-pressed={mode === item.id}
           onClick={() => setMode(item.id)}
           disabled={disabled}
           className={`border-r border-slate-300 px-2 py-2 text-sm font-semibold last:border-r-0 disabled:cursor-not-allowed disabled:opacity-60 ${
@@ -1110,7 +1111,7 @@ function AfterActionBoard({ state }: { state: DemoState }) {
                   <h2 className="text-lg font-semibold">회의·훈련 요약 작성</h2>
                   <p className="mt-1 text-sm text-slate-600">회의록과 훈련 사후검토를 주간보고 항목으로 정리합니다.</p>
                 </div>
-                <div className="w-full md:w-80">
+                <div className="w-full md:w-80" {...publicDemoTourTarget("after-action-mode")}>
                   <ModeButtons config={config} mode={mode} setMode={setMode} tone="slate" />
                 </div>
               </div>

@@ -17,6 +17,7 @@ export type PublicDemoTourTargetId =
   | "admin-doc-type"
   | "admin-doc-generate"
   | "admin-doc-result"
+  | "after-action-mode"
   | "after-action-source"
   | "after-action-generate"
   | "after-action-result";
@@ -25,6 +26,7 @@ export type PublicDemoTourStep = {
   targetId: PublicDemoTourTargetId;
   title: string;
   description: string;
+  clickSelector?: string;
 };
 
 export type PublicDemoTourPage = {
@@ -47,9 +49,9 @@ export const PUBLIC_DEMO_TOUR_PAGES: readonly PublicDemoTourPage[] = [
     label: "문서지원",
     href: "/military-ai-demo",
     steps: [
-      { targetId: "military-ai-tools", title: "문서 작업 선택", description: "문서, 회의, AAR, 주간보고, 보안검토 중 필요한 작업을 선택합니다." },
+      { targetId: "military-ai-tools", clickSelector: '[data-tour-id="military-ai-tools"] button:nth-of-type(2)', title: "회의 작업 선택", description: "회의 버튼을 실제로 눌러 입력 안내와 실행 버튼이 바뀌는 모습을 보여 줍니다." },
       { targetId: "military-ai-input", title: "작성 조건 입력", description: "문서 작성에 필요한 조건과 예시를 확인합니다." },
-      { targetId: "military-ai-generate", title: "문서 생성", description: "시연용 문서를 만드는 동작입니다. 튜토리얼이 대신 실행하지 않습니다." },
+      { targetId: "military-ai-tools", clickSelector: '[data-tour-id="military-ai-tools"] button:nth-of-type(5)', title: "보안검토 전환", description: "보안 버튼을 실제로 눌러 전용 입력 안내와 점검 화면으로 전환합니다. 생성 API는 실행하지 않습니다." },
     ],
   },
   {
@@ -58,7 +60,7 @@ export const PUBLIC_DEMO_TOUR_PAGES: readonly PublicDemoTourPage[] = [
     href: "/ops-radar-demo",
     steps: [
       { targetId: "ops-radar-tasks", title: "과업 현황", description: "과업과 선후행 관계를 한곳에서 확인합니다." },
-      { targetId: "ops-radar-evaluate", title: "병목 평가", description: "시연 평가를 시작하는 위치입니다. 튜토리얼은 평가를 실행하지 않습니다." },
+      { targetId: "ops-radar-evaluate", clickSelector: '[data-tour-id="ops-radar-evaluate"]', title: "병목 평가 실행", description: "업무 평가 실행 버튼을 실제로 눌러 병목, 영향 업무, 보고 패널을 표시합니다." },
 
     ],
   },
@@ -67,8 +69,8 @@ export const PUBLIC_DEMO_TOUR_PAGES: readonly PublicDemoTourPage[] = [
     label: "행정문서",
     href: "/admin-doc-demo",
     steps: [
-      { targetId: "admin-doc-type", title: "문서 유형 선택", description: "작성할 행정문서의 유형을 선택합니다." },
-      { targetId: "admin-doc-generate", title: "초안 작성", description: "선택한 유형의 초안을 만드는 위치입니다. 튜토리얼은 실행하지 않습니다." },
+      { targetId: "admin-doc-type", clickSelector: '[data-tour-id="admin-doc-type"] button:nth-of-type(3)', title: "결재요지 선택", description: "결재요지 메뉴를 실제로 눌러 입력 안내와 미리보기 계약을 바꿉니다." },
+      { targetId: "admin-doc-type", clickSelector: '[data-tour-id="admin-doc-type"] button:nth-of-type(4)', title: "보안검토 선택", description: "보안검토 메뉴를 실제로 눌러 마스킹 점검 화면으로 전환합니다. 초안 생성은 사용자가 직접 실행합니다." },
 
     ],
   },
@@ -77,8 +79,8 @@ export const PUBLIC_DEMO_TOUR_PAGES: readonly PublicDemoTourPage[] = [
     label: "사후조치",
     href: "/after-action-demo",
     steps: [
-      { targetId: "after-action-source", title: "회의·훈련 자료", description: "요약에 사용할 시연 자료를 확인합니다." },
-      { targetId: "after-action-generate", title: "사후조치 정리", description: "요약을 만드는 위치입니다. 튜토리얼은 실행하지 않습니다." },
+      { targetId: "after-action-mode", clickSelector: '[data-tour-id="after-action-mode"] button:nth-of-type(2)', title: "주간보고 전환", description: "주간 버튼을 실제로 눌러 주간보고 입력 안내와 실행 버튼을 표시합니다." },
+      { targetId: "after-action-mode", clickSelector: '[data-tour-id="after-action-mode"] button:nth-of-type(3)', title: "조치 목록 전환", description: "조치 버튼을 실제로 눌러 담당·기한 중심의 조치 목록 화면으로 전환합니다. 생성 API는 실행하지 않습니다." },
 
     ],
   },
@@ -157,8 +159,10 @@ export function PublicDemoTour({ currentPage }: { currentPage: PublicDemoTourPag
 
       const end = direction === "forward" ? page.steps.length : -1;
       for (let index = stepIndex; index !== end; index += direction === "forward" ? 1 : -1) {
-        const target = document.querySelector<HTMLElement>(`[data-tour-id="${page.steps[index].targetId}"]`);
+        const step = page.steps[index];
+        const target = document.querySelector<HTMLElement>(`[data-tour-id="${step.targetId}"]`);
         if (!target) continue;
+        if (step.clickSelector) document.querySelector<HTMLElement>(step.clickSelector)?.click();
         const nextState = { status: "active", pageIndex, stepIndex: index, direction } as const;
         writeState(nextState);
         setTourState(nextState);
@@ -282,7 +286,7 @@ export function PublicDemoTour({ currentPage }: { currentPage: PublicDemoTourPag
             <p className="text-sm font-semibold text-blue-700">4개 공개 시연 둘러보기</p>
             <h2 id="public-demo-tour-title" className="mt-2 text-2xl font-bold">Node 공개 시연에 오신 것을 환영합니다</h2>
             <p id="public-demo-tour-description" className="mt-3 text-sm leading-6 text-slate-600">
-              문서지원, 과업상황, 행정문서, 사후조치 화면을 차례로 안내합니다. 실제 기능을 자동으로 실행하거나 API를 호출하지 않습니다.
+              문서지원, 과업상황, 행정문서, 사후조치의 안전한 로컬 기능을 실제로 눌러 시연합니다. AI 생성 API는 자동으로 호출하지 않습니다.
             </p>
             <div className="mt-6 flex justify-end gap-2">
               <button type="button" onClick={() => close("dismissed")} className="border border-slate-300 px-4 py-2 text-sm font-semibold hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700">나중에</button>
