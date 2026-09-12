@@ -6,6 +6,7 @@ export const PUBLIC_DEMO_TOUR_STORAGE_KEY = "node-public-demo-tour-v1";
 
 export type PublicDemoTourPageId = "militaryAi" | "opsRadar" | "adminDoc" | "afterAction";
 export type PublicDemoTourDirection = "forward" | "backward";
+export type PublicDemoTourActionId = "meetingSummary" | "securityScan" | "evaluate" | "approval" | "security" | "weekly" | "actions";
 export type PublicDemoTourTargetId =
   | "military-ai-tools"
   | "military-ai-input"
@@ -26,7 +27,7 @@ export type PublicDemoTourStep = {
   targetId: PublicDemoTourTargetId;
   title: string;
   description: string;
-  clickSelector?: string;
+  actionId?: PublicDemoTourActionId;
 };
 
 export type PublicDemoTourPage = {
@@ -49,9 +50,9 @@ export const PUBLIC_DEMO_TOUR_PAGES: readonly PublicDemoTourPage[] = [
     label: "문서지원",
     href: "/military-ai-demo",
     steps: [
-      { targetId: "military-ai-tools", clickSelector: '[data-tour-id="military-ai-tools"] button:nth-of-type(2)', title: "회의 작업 선택", description: "회의 버튼을 실제로 눌러 입력 안내와 실행 버튼이 바뀌는 모습을 보여 줍니다." },
+      { targetId: "military-ai-tools", actionId: "meetingSummary", title: "회의 작업 선택", description: "회의 버튼을 실제로 눌러 입력 안내와 실행 버튼이 바뀌는 모습을 보여 줍니다." },
       { targetId: "military-ai-input", title: "작성 조건 입력", description: "문서 작성에 필요한 조건과 예시를 확인합니다." },
-      { targetId: "military-ai-tools", clickSelector: '[data-tour-id="military-ai-tools"] button:nth-of-type(5)', title: "보안검토 전환", description: "보안 버튼을 실제로 눌러 전용 입력 안내와 점검 화면으로 전환합니다. 생성 API는 실행하지 않습니다." },
+      { targetId: "military-ai-tools", actionId: "securityScan", title: "보안검토 전환", description: "보안 버튼을 실제로 눌러 전용 입력 안내와 점검 화면으로 전환합니다. 생성 API는 실행하지 않습니다." },
     ],
   },
   {
@@ -60,7 +61,7 @@ export const PUBLIC_DEMO_TOUR_PAGES: readonly PublicDemoTourPage[] = [
     href: "/ops-radar-demo",
     steps: [
       { targetId: "ops-radar-tasks", title: "과업 현황", description: "과업과 선후행 관계를 한곳에서 확인합니다." },
-      { targetId: "ops-radar-evaluate", clickSelector: '[data-tour-id="ops-radar-evaluate"]', title: "병목 평가 실행", description: "업무 평가 실행 버튼을 실제로 눌러 병목, 영향 업무, 보고 패널을 표시합니다." },
+      { targetId: "ops-radar-evaluate", actionId: "evaluate", title: "병목 평가 실행", description: "업무 평가 실행 버튼을 실제로 눌러 병목, 영향 업무, 보고 패널을 표시합니다." },
 
     ],
   },
@@ -69,8 +70,8 @@ export const PUBLIC_DEMO_TOUR_PAGES: readonly PublicDemoTourPage[] = [
     label: "행정문서",
     href: "/admin-doc-demo",
     steps: [
-      { targetId: "admin-doc-type", clickSelector: '[data-tour-id="admin-doc-type"] button:nth-of-type(3)', title: "결재요지 선택", description: "결재요지 메뉴를 실제로 눌러 입력 안내와 미리보기 계약을 바꿉니다." },
-      { targetId: "admin-doc-type", clickSelector: '[data-tour-id="admin-doc-type"] button:nth-of-type(4)', title: "보안검토 선택", description: "보안검토 메뉴를 실제로 눌러 마스킹 점검 화면으로 전환합니다. 초안 생성은 사용자가 직접 실행합니다." },
+      { targetId: "admin-doc-type", actionId: "approval", title: "결재요지 선택", description: "결재요지 메뉴를 실제로 눌러 입력 안내와 미리보기 계약을 바꿉니다." },
+      { targetId: "admin-doc-type", actionId: "security", title: "보안검토 선택", description: "보안검토 메뉴를 실제로 눌러 마스킹 점검 화면으로 전환합니다. 초안 생성은 사용자가 직접 실행합니다." },
 
     ],
   },
@@ -79,8 +80,8 @@ export const PUBLIC_DEMO_TOUR_PAGES: readonly PublicDemoTourPage[] = [
     label: "사후조치",
     href: "/after-action-demo",
     steps: [
-      { targetId: "after-action-mode", clickSelector: '[data-tour-id="after-action-mode"] button:nth-of-type(2)', title: "주간보고 전환", description: "주간 버튼을 실제로 눌러 주간보고 입력 안내와 실행 버튼을 표시합니다." },
-      { targetId: "after-action-mode", clickSelector: '[data-tour-id="after-action-mode"] button:nth-of-type(3)', title: "조치 목록 전환", description: "조치 버튼을 실제로 눌러 담당·기한 중심의 조치 목록 화면으로 전환합니다. 생성 API는 실행하지 않습니다." },
+      { targetId: "after-action-mode", actionId: "weekly", title: "주간보고 전환", description: "주간 버튼을 실제로 눌러 주간보고 입력 안내와 실행 버튼을 표시합니다." },
+      { targetId: "after-action-mode", actionId: "actions", title: "조치 목록 전환", description: "조치 버튼을 실제로 눌러 담당·기한 중심의 조치 목록 화면으로 전환합니다. 생성 API는 실행하지 않습니다." },
 
     ],
   },
@@ -162,7 +163,11 @@ export function PublicDemoTour({ currentPage }: { currentPage: PublicDemoTourPag
         const step = page.steps[index];
         const target = document.querySelector<HTMLElement>(`[data-tour-id="${step.targetId}"]`);
         if (!target) continue;
-        if (step.clickSelector) document.querySelector<HTMLElement>(step.clickSelector)?.click();
+        if (step.actionId) {
+          const action = document.querySelector<HTMLButtonElement>(`button[data-tour-action="${step.actionId}"]`);
+          if (!action || action.disabled) return;
+          action.click();
+        }
         const nextState = { status: "active", pageIndex, stepIndex: index, direction } as const;
         writeState(nextState);
         setTourState(nextState);

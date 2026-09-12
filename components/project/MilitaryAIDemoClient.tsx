@@ -671,6 +671,7 @@ export function MilitaryAIDemoClient() {
                   <button
                     key={tool.id}
                     type="button"
+                    data-tour-action={tool.id}
                     aria-pressed={active}
                     onClick={() => selectTool(tool.id)}
                     className={`flex min-h-16 items-center gap-2 rounded-lg border px-3 py-2 text-left text-sm transition disabled:cursor-not-allowed disabled:opacity-60 ${
