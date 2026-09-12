@@ -42,6 +42,7 @@ describe("opsRadar public demo generation", () => {
     const request = generateMilitaryAIJson.mock.calls[0][0] as Record<string, unknown>;
     expect(request.sourceText).toBe(sourceText);
     expect(request.provider).toBe("gemini");
+    expect(request.maxTokens).toBe(3_000);
     expect(String(request.userInstruction)).toContain("지휘관 상황보고");
     expect((request.metadata as Record<string, unknown>).service).toBe("opsRadar");
     expect(result.model).toBe("gemini-2.5-flash");
