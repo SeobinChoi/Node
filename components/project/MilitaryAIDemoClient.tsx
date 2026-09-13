@@ -10,6 +10,7 @@ import {
   FileText,
   GitBranch,
   ListChecks,
+  LoaderCircle,
   RefreshCcw,
   Save,
   ShieldCheck,
@@ -737,12 +738,19 @@ export function MilitaryAIDemoClient() {
                 type="button"
                 data-tour-id="military-ai-generate"
                 data-tour-action="generateAi"
+                data-ai-generating={pendingAction === "generate" ? "true" : undefined}
                 onClick={generate}
                 disabled={Boolean(pendingAction)}
-                className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-slate-950 px-3 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60"
+                className={`inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-slate-950 px-3 text-sm font-medium text-white disabled:cursor-not-allowed ${pendingAction === "generate" ? "ring-4 ring-blue-200 shadow-[0_0_24px_rgba(59,130,246,0.55)] motion-safe:animate-pulse" : "disabled:opacity-60"}`}
               >
-                <Sparkles className="h-4 w-4" />
-                {pendingAction === "generate" ? "생성 중..." : activeTool.ctaLabel}
+                {pendingAction === "generate" ? (
+                  <>
+                    <LoaderCircle data-testid="ai-generation-spinner" className="h-4 w-4 motion-safe:animate-spin" />
+                    <span>AI가 생성하고 있습니다</span>
+                  </>
+                ) : (
+                  <><Sparkles className="h-4 w-4" />{activeTool.ctaLabel}</>
+                )}
               </button>
               <button
                 type="button"
@@ -763,6 +771,7 @@ export function MilitaryAIDemoClient() {
                 <RefreshCcw className="h-4 w-4" />
               </button>
             </div>
+            {pendingAction === "generate" ? <span role="status" aria-label="AI가 생성하고 있습니다" className="sr-only">AI가 생성하고 있습니다</span> : null}
             {error ? <p role="alert" data-tour-ai-error="true" className="mt-3 text-sm font-semibold text-red-700">{error} 생성 버튼을 다시 눌러 재시도할 수 있습니다.</p> : null}
           </aside>
 

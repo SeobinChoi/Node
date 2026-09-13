@@ -125,7 +125,7 @@ test("interactive public demo controls do not overflow on mobile", async ({ page
   }
 });
 
-test("first browser session tutorial demonstrates one safe AI generation", async ({ browser }) => {
+test("tutorial requires real controls and shows AI generation before advancing", async ({ browser }) => {
   test.setTimeout(75_000);
   const safeExample = examplesForTool("meetingSummary")[0];
   const context = await browser.newContext();
@@ -149,37 +149,43 @@ test("first browser session tutorial demonstrates one safe AI generation", async
           ...safeExample.baselineResult,
           markdown: `# ${safeExample.baselineResult.title}`,
           model: "curated-sample-fallback",
-          security: [],
-          metrics: [],
-          workItems: [],
+          security: [], metrics: [], workItems: [],
         },
       },
     });
   });
 
   await page.goto("/military-ai-demo");
-  const firstAction = page.locator('[data-tour-action="meetingSummary"]');
-  await expect(firstAction).toHaveCount(1);
-  await expect(page.getByRole("heading", { name: "Node 공개 시연에 오신 것을 환영합니다" })).toBeVisible();
-  await firstAction.evaluate((element) => element.removeAttribute("data-tour-action"));
   await page.getByRole("button", { name: "시작", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Node 공개 시연에 오신 것을 환영합니다" })).toBeVisible();
-  expect(await page.evaluate(() => sessionStorage.getItem("node-public-demo-tour-v1"))).toBeNull();
-  await page.reload();
-  await expect(page.locator('[data-tour-action="meetingSummary"]')).toHaveCount(1);
-  await page.getByRole("button", { name: "시작", exact: true }).click();
+  const meetingAction = page.locator('[data-tour-action="meetingSummary"]');
   await expect(page.getByText("화면 1/4 · 단계 1/4")).toBeVisible();
+  await expect(page.getByTestId("tour-action-highlight")).toBeVisible();
   await expect(page.getByTestId("tour-click-indicator")).toBeVisible();
-  await firstAction.focus();
-  await expect(firstAction).toBeFocused();
-  await expect(page.getByRole("button", { name: "회의", exact: true })).toHaveAttribute("aria-pressed", "true");
-  await expect(page.getByText("화면 1/4 · 단계 2/4")).toBeVisible({ timeout: 5_000 });
-  await page.locator("#demo-source").fill("사용자가 수정한 임의 입력");
-  await expect(page.getByRole("button", { name: "생성 중...", exact: true })).toBeVisible({ timeout: 5_000 });
-  await expect(page.getByRole("button", { name: "다음", exact: true })).toBeDisabled();
-  await expect(page.getByText("화면 1/4 · 단계 3/4")).toBeVisible();
   await page.waitForTimeout(2_700);
+  await expect(meetingAction).toHaveAttribute("aria-pressed", "false");
+  await meetingAction.click();
+  await expect(meetingAction).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByText("화면 1/4 · 단계 2/4")).toBeVisible({ timeout: 5_000 });
+  await page.getByRole("button", { name: "이전", exact: true }).click();
+  await expect(page.getByText("화면 1/4 · 단계 1/4")).toBeVisible();
+  await meetingAction.click();
+  await expect(page.getByText("화면 1/4 · 단계 2/4")).toBeVisible({ timeout: 5_000 });
+
+  await page.locator("#demo-source").fill("사용자가 수정한 임의 입력");
+  await page.getByRole("button", { name: "넘어가기", exact: true }).click();
   await expect(page.getByText("화면 1/4 · 단계 3/4")).toBeVisible();
+  const generateAction = page.locator('[data-tour-action="generateAi"]');
+  const actionBox = await generateAction.boundingBox();
+  const cardBox = await page.getByRole("heading", { name: "AI 회의록 생성" }).locator("..").boundingBox();
+  expect(actionBox && cardBox && (cardBox.y + cardBox.height <= actionBox.y || actionBox.y + actionBox.height <= cardBox.y)).toBeTruthy();
+  await page.waitForTimeout(1_000);
+  expect(generationPayload).toBeUndefined();
+  await generateAction.click();
+  await expect(generateAction).toHaveAttribute("data-ai-generating", "true");
+  await expect(page.getByTestId("ai-generation-spinner")).toBeVisible();
+  await expect(page.getByRole("status", { name: "AI가 생성하고 있습니다" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "넘어가기", exact: true })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "종료", exact: true })).toBeDisabled();
   expect(generationPayload).toEqual({
     service: "militaryAi",
     tool: "meetingSummary",
@@ -187,50 +193,66 @@ test("first browser session tutorial demonstrates one safe AI generation", async
     exampleId: safeExample.id,
   });
   releaseGeneration();
-  await expect(page.getByTestId("military-result-panel")).toBeVisible({ timeout: 5_000 });
   await expect(page.getByTestId("military-result-panel")).toContainText("샘플 fallback");
-  await expect(page.locator('[data-tour-action="generateAi"]')).toBeDisabled();
-  await expect(page.getByRole("button", { name: "보안", exact: true })).toHaveAttribute("aria-pressed", "true", { timeout: 8_000 });
+  await expect(generateAction).toBeDisabled();
+  await expect(page.getByText("화면 1/4 · 단계 4/4")).toBeVisible({ timeout: 8_000 });
+  await expect(page.getByRole("button", { name: "보안", exact: true })).toHaveAttribute("aria-pressed", "false");
   await page.reload();
-  await expect(page.getByRole("button", { name: "보안", exact: true })).toHaveAttribute("aria-pressed", "true");
-  await expect(page.getByRole("button", { name: "보안 검토", exact: true })).toBeAttached();
+  await expect(page.getByText("화면 1/4 · 단계 4/4")).toBeVisible();
+  await expect(page.locator('[data-tour-action="generateAi"]')).toBeDisabled();
 
-  await expect(page).toHaveURL(/\/ops-radar-demo$/, { timeout: 5_000 });
-  await expect(page.locator('[data-tour-action="evaluate"]')).toHaveCount(1);
+  await page.getByRole("button", { name: "튜토리얼 다시 시작", exact: true }).click();
+  await expect(page.getByText("화면 1/4 · 단계 1/4")).toBeVisible();
+  await page.getByRole("button", { name: "넘어가기", exact: true }).click();
+  await expect(page.getByText("화면 1/4 · 단계 2/4")).toBeVisible();
+  await page.getByRole("button", { name: "넘어가기", exact: true }).click();
+  await expect(page.getByText("화면 1/4 · 단계 4/4")).toBeVisible();
+  await expect(page.locator('[data-tour-action="generateAi"]')).toBeDisabled();
+  expect(mutatingRequests).toEqual(["POST /api/demo/generate"]);
+
+  await page.getByRole("button", { name: "넘어가기", exact: true }).click();
+  await expect(page).toHaveURL(/\/ops-radar-demo$/);
   await expect(page.getByText("화면 2/4 · 단계 1/2")).toBeVisible();
-  await expect(page.getByText("평가 완료 · 규칙 기반 평가")).toBeAttached({ timeout: 5_000 });
-  await expect(page.getByTestId("ops-action-lead")).toContainText("우선 조치");
-
-  await expect(page).toHaveURL(/\/admin-doc-demo$/, { timeout: 5_000 });
-  await expect(page.locator('[data-tour-action="approval"]')).toHaveCount(1);
-  await expect(page.locator('[data-tour-action="security"]')).toHaveCount(1);
+  await page.getByRole("button", { name: "넘어가기", exact: true }).click();
+  await expect(page.getByText("화면 2/4 · 단계 2/2")).toBeVisible();
+  await page.locator('[data-tour-action="evaluate"]').click();
+  await expect(page).toHaveURL(/\/admin-doc-demo$/);
   await expect(page.getByText("화면 3/4 · 단계 1/2")).toBeVisible();
-  await expect(page.getByRole("button", { name: "결재요지", exact: true })).toHaveAttribute("aria-pressed", "true");
-  await expect(page.getByRole("button", { name: "보안검토", exact: true })).toHaveAttribute("aria-pressed", "true", { timeout: 5_000 });
-
-  await expect(page).toHaveURL(/\/after-action-demo$/, { timeout: 5_000 });
-  await expect(page.locator('[data-tour-action="weekly"]')).toHaveCount(1);
-  await expect(page.locator('[data-tour-action="actions"]')).toHaveCount(1);
+  await page.locator('[data-tour-action="approval"]').click();
+  await expect(page.getByText("화면 3/4 · 단계 2/2")).toBeVisible();
+  await page.locator('[data-tour-action="security"]').click();
+  await expect(page).toHaveURL(/\/after-action-demo$/);
   await expect(page.getByText("화면 4/4 · 단계 1/2")).toBeVisible();
-  await expect(page.getByRole("button", { name: "주간", exact: true })).toHaveAttribute("aria-pressed", "true");
-  await expect(page.getByRole("button", { name: "주간보고 생성", exact: true })).toBeAttached();
-  await expect(page.getByRole("button", { name: "조치", exact: true })).toHaveAttribute("aria-pressed", "true", { timeout: 5_000 });
-  await expect(page.getByRole("button", { name: "조치 목록 생성", exact: true })).toBeAttached();
-
-  await expect(page.getByText("화면 4/4")).toHaveCount(0, { timeout: 5_000 });
+  await page.locator('[data-tour-action="weekly"]').click();
+  await expect(page.getByText("화면 4/4 · 단계 2/2")).toBeVisible();
+  await page.locator('[data-tour-action="actions"]').click();
+  await expect(page.getByRole("dialog")).toBeHidden();
   expect(mutatingRequests).toEqual(["POST /api/demo/generate"]);
   expect(downloads).toBe(0);
-  expect(await page.evaluate(() => JSON.parse(sessionStorage.getItem("node-public-demo-tour-v1") ?? "null")?.status)).toBe("completed");
-  await page.goto("/military-ai-demo");
-  await expect(page.getByRole("heading", { name: "Node 공개 시연에 오신 것을 환영합니다" })).toHaveCount(0);
-  await page.getByRole("button", { name: "튜토리얼 다시 시작", exact: true }).click();
-  await expect(page.getByRole("button", { name: "보안", exact: true })).toHaveAttribute("aria-pressed", "true", { timeout: 8_000 });
-  expect(mutatingRequests).toEqual(["POST /api/demo/generate"]);
-  await page.getByRole("button", { name: "종료", exact: true }).click();
+  await context.close();
 });
 
-test("interrupted tutorial generation never repeats automatically", async ({ browser }) => {
-  const context = await browser.newContext({ reducedMotion: "reduce" });
+test("tutorial skip avoids the AI request", async ({ browser }) => {
+  const context = await browser.newContext();
+  const page = await context.newPage();
+  let requests = 0;
+  await page.route("**/api/demo/generate", async (route) => {
+    requests += 1;
+    await route.abort();
+  });
+  await page.goto("/military-ai-demo");
+  await page.getByRole("button", { name: "시작", exact: true }).click();
+  await page.getByRole("button", { name: "넘어가기", exact: true }).click();
+  await page.getByRole("button", { name: "넘어가기", exact: true }).click();
+  await expect(page.getByText("화면 1/4 · 단계 3/4")).toBeVisible();
+  await page.getByRole("button", { name: "넘어가기", exact: true }).click();
+  expect(requests).toBe(0);
+  await expect(page.getByText("화면 1/4 · 단계 4/4")).toBeVisible();
+  await context.close();
+});
+
+test("interrupted manual generation never repeats without another click", async ({ browser }) => {
+  const context = await browser.newContext();
   const page = await context.newPage();
   let requests = 0;
   let release!: () => void;
@@ -243,71 +265,45 @@ test("interrupted tutorial generation never repeats automatically", async ({ bro
 
   await page.goto("/military-ai-demo");
   await page.getByRole("button", { name: "시작", exact: true }).click();
-  await page.getByRole("button", { name: "다음", exact: true }).click();
-  await page.getByRole("button", { name: "다음", exact: true }).click();
+  await page.getByRole("button", { name: "넘어가기", exact: true }).click();
+  await page.getByRole("button", { name: "넘어가기", exact: true }).click();
+  await page.locator('[data-tour-action="generateAi"]').click();
   await expect.poll(() => requests).toBe(1);
   await page.reload();
   await expect(page.getByText("화면 1/4 · 단계 3/4")).toBeVisible();
   await page.waitForTimeout(1_000);
   expect(requests).toBe(1);
   await expect(page.locator('[data-tour-action="generateAi"]')).toHaveAttribute("data-tour-trigger", "true");
-  await expect(page.getByRole("button", { name: "다음", exact: true })).toBeDisabled();
   release();
   await context.close();
 });
 
-test("failed tutorial generation announces an exact-fixture retry", async ({ browser }) => {
+test("failed manual tutorial generation keeps an exact-fixture retry", async ({ browser }) => {
   const safeExample = examplesForTool("meetingSummary")[0];
-  const context = await browser.newContext({ reducedMotion: "reduce" });
+  const context = await browser.newContext();
   const page = await context.newPage();
   const payloads: Record<string, unknown>[] = [];
   await page.route("**/api/demo/generate", async (route) => {
     payloads.push(route.request().postDataJSON());
-    if (payloads.length === 1) {
-      await route.fulfill({ status: 500, json: { error: "일시적인 생성 오류" } });
-      return;
-    }
-    await route.fulfill({
-      json: {
-        ok: true,
-        result: {
-          ...safeExample.baselineResult,
-          markdown: `# ${safeExample.baselineResult.title}`,
-          model: "curated-sample-fallback",
-          security: [],
-          metrics: [],
-          workItems: [],
-        },
-      },
-    });
+    if (payloads.length === 1) return route.fulfill({ status: 500, json: { error: "일시적인 생성 오류" } });
+    await route.fulfill({ json: { ok: true, result: { ...safeExample.baselineResult, markdown: "# retry", model: "curated-sample-fallback", security: [], metrics: [], workItems: [] } } });
   });
 
   await page.goto("/military-ai-demo");
   await page.getByRole("button", { name: "시작", exact: true }).click();
-  await page.getByRole("button", { name: "다음", exact: true }).click();
-  await page.getByRole("button", { name: "다음", exact: true }).click();
+  await page.getByRole("button", { name: "넘어가기", exact: true }).click();
+  await page.getByRole("button", { name: "넘어가기", exact: true }).click();
+  const generateAction = page.locator('[data-tour-action="generateAi"]');
+  await generateAction.click();
   await expect(page.locator('[data-tour-ai-error="true"]')).toContainText("다시 눌러 재시도");
+  await expect(page.getByRole("button", { name: "넘어가기", exact: true })).toBeEnabled();
   await page.locator("#demo-source").fill("재시도 전에 바꾼 입력");
-  await page.locator('[data-tour-action="generateAi"]').click();
+  await generateAction.click();
   await expect(page.getByTestId("military-result-panel")).toContainText("샘플 fallback");
-  await expect(page.locator('[data-tour-action="generateAi"]')).toBeDisabled();
   expect(payloads).toEqual([
     { service: "militaryAi", tool: "meetingSummary", sourceText: safeExample.sourceText, exampleId: safeExample.id },
     { service: "militaryAi", tool: "meetingSummary", sourceText: safeExample.sourceText, exampleId: safeExample.id },
   ]);
-  await context.close();
-});
-
-test("automatic tutorial waits for manual navigation with reduced motion", async ({ browser }) => {
-  const context = await browser.newContext({ reducedMotion: "reduce" });
-  const page = await context.newPage();
-  await page.goto("/military-ai-demo");
-  await page.getByRole("button", { name: "시작", exact: true }).click();
-  await expect(page.getByText("화면 1/4 · 단계 1/4")).toBeVisible();
-  await page.waitForTimeout(2_700);
-  await expect(page.getByText("화면 1/4 · 단계 1/4")).toBeVisible();
-  await page.getByRole("button", { name: "다음", exact: true }).click();
-  await expect(page.getByText("화면 1/4 · 단계 2/4")).toBeVisible();
   await context.close();
 });
 
