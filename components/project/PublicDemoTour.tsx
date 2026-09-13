@@ -53,10 +53,10 @@ export const PUBLIC_DEMO_TOUR_PAGES: readonly PublicDemoTourPage[] = [
     label: "문서지원",
     href: "/military-ai-demo",
     steps: [
-      { targetId: "military-ai-tools", actionId: "meetingSummary", title: "회의 작업 선택", description: "회의 버튼을 실제로 눌러 입력 안내와 실행 버튼이 바뀌는 모습을 보여 줍니다." },
+      { targetId: "military-ai-tools", actionId: "meetingSummary", completionSelector: '[data-tour-action="meetingSummary"][aria-pressed="true"]', title: "회의 작업 선택", description: "회의 버튼을 실제로 눌러 입력 안내와 실행 버튼이 바뀌는 모습을 보여 줍니다." },
       { targetId: "military-ai-input", title: "작성 조건 입력", description: "문서 작성에 필요한 조건과 예시를 확인합니다." },
       { targetId: "military-ai-generate", actionId: "generateAi", completionSelector: '[data-tour-ai-result="complete"]', title: "AI 회의록 생성", description: "안전한 합성 예시로 실제 Gemini 생성 경로를 실행합니다. 중단되거나 실패하면 표시된 생성 버튼을 다시 눌러 재시도하세요." },
-      { targetId: "military-ai-tools", actionId: "securityScan", title: "보안검토 전환", description: "보안 버튼을 실제로 눌러 전용 입력 안내와 점검 화면으로 전환합니다." },
+      { targetId: "military-ai-tools", actionId: "securityScan", completionSelector: '[data-tour-action="securityScan"][aria-pressed="true"]', title: "보안검토 전환", description: "보안 버튼을 실제로 눌러 전용 입력 안내와 점검 화면으로 전환합니다." },
     ],
   },
   {
@@ -65,7 +65,7 @@ export const PUBLIC_DEMO_TOUR_PAGES: readonly PublicDemoTourPage[] = [
     href: "/ops-radar-demo",
     steps: [
       { targetId: "ops-radar-tasks", title: "과업 현황", description: "과업과 선후행 관계를 한곳에서 확인합니다." },
-      { targetId: "ops-radar-evaluate", actionId: "evaluate", title: "병목 평가 실행", description: "업무 평가 실행 버튼을 실제로 눌러 병목, 영향 업무, 보고 패널을 표시합니다." },
+      { targetId: "ops-radar-evaluate", actionId: "evaluate", completionSelector: '[data-tour-action="evaluate"][aria-pressed="true"]', title: "병목 평가 실행", description: "업무 평가 실행 버튼을 실제로 눌러 병목, 영향 업무, 보고 패널을 표시합니다." },
 
     ],
   },
@@ -74,8 +74,8 @@ export const PUBLIC_DEMO_TOUR_PAGES: readonly PublicDemoTourPage[] = [
     label: "행정문서",
     href: "/admin-doc-demo",
     steps: [
-      { targetId: "admin-doc-type", actionId: "approval", title: "결재요지 선택", description: "결재요지 메뉴를 실제로 눌러 입력 안내와 미리보기 계약을 바꿉니다." },
-      { targetId: "admin-doc-type", actionId: "security", title: "보안검토 선택", description: "보안검토 메뉴를 실제로 눌러 마스킹 점검 화면으로 전환합니다. 초안 생성은 사용자가 직접 실행합니다." },
+      { targetId: "admin-doc-type", actionId: "approval", completionSelector: '[data-tour-action="approval"][aria-pressed="true"]', title: "결재요지 선택", description: "결재요지 메뉴를 실제로 눌러 입력 안내와 미리보기 계약을 바꿉니다." },
+      { targetId: "admin-doc-type", actionId: "security", completionSelector: '[data-tour-action="security"][aria-pressed="true"]', title: "보안검토 선택", description: "보안검토 메뉴를 실제로 눌러 마스킹 점검 화면으로 전환합니다. 초안 생성은 사용자가 직접 실행합니다." },
 
     ],
   },
@@ -84,8 +84,8 @@ export const PUBLIC_DEMO_TOUR_PAGES: readonly PublicDemoTourPage[] = [
     label: "사후조치",
     href: "/after-action-demo",
     steps: [
-      { targetId: "after-action-mode", actionId: "weekly", title: "주간보고 전환", description: "주간 버튼을 실제로 눌러 주간보고 입력 안내와 실행 버튼을 표시합니다." },
-      { targetId: "after-action-mode", actionId: "actions", title: "조치 목록 전환", description: "조치 버튼을 실제로 눌러 담당·기한 중심의 조치 목록 화면으로 전환합니다. 생성 API는 실행하지 않습니다." },
+      { targetId: "after-action-mode", actionId: "weekly", completionSelector: '[data-tour-action="weekly"][aria-pressed="true"]', title: "주간보고 전환", description: "주간 버튼을 실제로 눌러 주간보고 입력 안내와 실행 버튼을 표시합니다." },
+      { targetId: "after-action-mode", actionId: "actions", completionSelector: '[data-tour-action="actions"][aria-pressed="true"]', title: "조치 목록 전환", description: "조치 버튼을 실제로 눌러 담당·기한 중심의 조치 목록 화면으로 전환합니다. 생성 API는 실행하지 않습니다." },
 
     ],
   },
@@ -131,47 +131,49 @@ function writeState(state: PublicDemoTourState) {
 export function PublicDemoTour({ currentPage }: { currentPage: PublicDemoTourPageId }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const restoreFocusRef = useRef<HTMLElement | null>(null);
-  const generationTriggeredRef = useRef(false);
   const readyToAdvanceRef = useRef(true);
   const [view, setView] = useState<"loading" | "welcome" | "tour" | "closed">("loading");
   const [tourState, setTourState] = useState<PublicDemoTourState | null>(null);
   const [targetRect, setTargetRect] = useState<DOMRect | null>(null);
+  const [actionRect, setActionRect] = useState<DOMRect | null>(null);
   const [clickPoint, setClickPoint] = useState<{ left: number; top: number } | null>(null);
-  const [autoAdvance, setAutoAdvance] = useState(true);
-  const [readyToAdvance, setReadyToAdvance] = useState(true);
+  const [actionPending, setActionPending] = useState(false);
 
   function setAdvanceReady(value: boolean) {
     readyToAdvanceRef.current = value;
-    setReadyToAdvance(value);
   }
 
   function close(status: "dismissed" | "completed") {
+    const persisted = readState();
     const generationAction = document.querySelector<HTMLButtonElement>('button[data-tour-action="generateAi"]');
     generationAction?.removeAttribute("data-tour-trigger");
-    if (generationAction) generationAction.disabled = false;
+    if (generationAction && persisted?.aiGenerationComplete !== true) generationAction.disabled = false;
     const state: PublicDemoTourState = {
       status,
       pageIndex: tourState?.pageIndex ?? 0,
       stepIndex: tourState?.stepIndex ?? 0,
       direction: "forward",
-      aiGenerated: tourState?.aiGenerated,
-      aiGenerationComplete: tourState?.aiGenerationComplete,
+      aiGenerated: persisted?.aiGenerated ?? tourState?.aiGenerated,
+      aiGenerationComplete: persisted?.aiGenerationComplete ?? tourState?.aiGenerationComplete,
     };
     writeState(state);
     setView("closed");
     setTourState(state);
     setTargetRect(null);
+    setActionRect(null);
     setClickPoint(null);
+    setActionPending(false);
   }
 
   function activate(candidate: PublicDemoTourState) {
     const previousGenerationAction = document.querySelector<HTMLButtonElement>('button[data-tour-action="generateAi"]');
     previousGenerationAction?.removeAttribute("data-tour-trigger");
-    if (previousGenerationAction) previousGenerationAction.disabled = false;
+    if (previousGenerationAction && candidate.aiGenerationComplete !== true) previousGenerationAction.disabled = false;
+    setActionPending(false);
     let pageIndex = candidate.pageIndex;
     let stepIndex = candidate.stepIndex;
     const direction = candidate.direction;
-    let aiGenerated = candidate.aiGenerated === true;
+    const aiGenerated = candidate.aiGenerated === true;
     const aiGenerationComplete = candidate.aiGenerationComplete === true;
 
     while (pageIndex >= 0 && pageIndex < PUBLIC_DEMO_TOUR_PAGES.length) {
@@ -186,36 +188,29 @@ export function PublicDemoTour({ currentPage }: { currentPage: PublicDemoTourPag
       const end = direction === "forward" ? page.steps.length : -1;
       for (let index = stepIndex; index !== end; index += direction === "forward" ? 1 : -1) {
         const step = page.steps[index];
-        if (step.actionId === "generateAi" && aiGenerationComplete) continue;
+        if (step.actionId === "generateAi" && aiGenerationComplete) {
+          const action = document.querySelector<HTMLButtonElement>('button[data-tour-action="generateAi"]');
+          if (action) action.disabled = true;
+          continue;
+        }
         const target = document.querySelector<HTMLElement>(`[data-tour-id="${step.targetId}"]`);
         if (!target) continue;
         target.scrollIntoView({ block: "center", behavior: "auto" });
         if (step.actionId) {
           const action = document.querySelector<HTMLButtonElement>(`button[data-tour-action="${step.actionId}"]`);
           if (!action || action.disabled) return;
-          if (step.actionId === "generateAi") {
-            action.dataset.tourTrigger = "true";
-            if (!aiGenerated) {
-              aiGenerated = true;
-              generationTriggeredRef.current = true;
-              writeState({ status: "active", pageIndex, stepIndex: index, direction, aiGenerated, aiGenerationComplete });
-            } else {
-              setClickPoint(null);
-            }
-          }
-          if (step.actionId !== "generateAi" || generationTriggeredRef.current) {
-            const actionRect = action.getBoundingClientRect();
-            setClickPoint({ left: actionRect.left + actionRect.width / 2, top: actionRect.top + actionRect.height / 2 });
-            action.click();
-            generationTriggeredRef.current = false;
-          }
+          if (step.actionId === "generateAi") action.dataset.tourTrigger = "true";
+          const rect = action.getBoundingClientRect();
+          setActionRect(rect);
+          setClickPoint({ left: rect.left + rect.width / 2, top: rect.top + rect.height / 2 });
         } else {
+          setActionRect(null);
           setClickPoint(null);
         }
         const nextState = { status: "active", pageIndex, stepIndex: index, direction, aiGenerated, aiGenerationComplete } as const;
         writeState(nextState);
         setTourState(nextState);
-        setAdvanceReady(!step.completionSelector || Boolean(document.querySelector(step.completionSelector)));
+        setAdvanceReady(!step.actionId);
         setTargetRect(target.getBoundingClientRect());
         setView("tour");
         return;
@@ -232,7 +227,6 @@ export function PublicDemoTour({ currentPage }: { currentPage: PublicDemoTourPag
 
   function start() {
     const previous = readState();
-    generationTriggeredRef.current = false;
     activate({
       status: "active",
       pageIndex: 0,
@@ -243,8 +237,8 @@ export function PublicDemoTour({ currentPage }: { currentPage: PublicDemoTourPag
     });
   }
 
-  function move(direction: PublicDemoTourDirection) {
-    if (!tourState || !readyToAdvanceRef.current) return;
+  function move(direction: PublicDemoTourDirection, bypass = false) {
+    if (!tourState || (!bypass && !readyToAdvanceRef.current)) return;
     const page = PUBLIC_DEMO_TOUR_PAGES[tourState.pageIndex];
     const offset = direction === "forward" ? 1 : -1;
     let pageIndex = tourState.pageIndex;
@@ -270,9 +264,19 @@ export function PublicDemoTour({ currentPage }: { currentPage: PublicDemoTourPag
     });
   }
 
+  function skip() {
+    if (actionPending) return;
+    document.querySelector<HTMLButtonElement>('button[data-tour-action="generateAi"]')?.removeAttribute("data-tour-trigger");
+    move("forward", true);
+  }
+
   useEffect(() => {
     const stored = readState();
     const task = window.requestAnimationFrame(() => {
+      if (stored?.aiGenerationComplete) {
+        const action = document.querySelector<HTMLButtonElement>('button[data-tour-action="generateAi"]');
+        if (action) action.disabled = true;
+      }
       if (!stored) setView("welcome");
       else if (stored.status === "active") activate(stored);
       else setView("closed");
@@ -280,10 +284,6 @@ export function PublicDemoTour({ currentPage }: { currentPage: PublicDemoTourPag
     return () => window.cancelAnimationFrame(task);
     // The initial session state is intentionally read once per route hydration.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  useEffect(() => {
-    setAutoAdvance(!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches);
   }, []);
 
   useEffect(() => {
@@ -301,10 +301,22 @@ export function PublicDemoTour({ currentPage }: { currentPage: PublicDemoTourPag
 
   useEffect(() => {
     if (view !== "tour" || !tourState) return;
-    const targetId = PUBLIC_DEMO_TOUR_PAGES[tourState.pageIndex].steps[tourState.stepIndex].targetId;
+    const activeStep = PUBLIC_DEMO_TOUR_PAGES[tourState.pageIndex].steps[tourState.stepIndex];
+    const targetId = activeStep.targetId;
     const update = () => {
       const target = document.querySelector<HTMLElement>(`[data-tour-id="${targetId}"]`);
       if (target) setTargetRect(target.getBoundingClientRect());
+      const action = activeStep.actionId && !actionPending
+        ? document.querySelector<HTMLButtonElement>(`button[data-tour-action="${activeStep.actionId}"]`)
+        : null;
+      if (action) {
+        const rect = action.getBoundingClientRect();
+        setActionRect(rect);
+        setClickPoint({ left: rect.left + rect.width / 2, top: rect.top + rect.height / 2 });
+      } else {
+        setActionRect(null);
+        setClickPoint(null);
+      }
     };
     window.addEventListener("resize", update);
     window.addEventListener("scroll", update, true);
@@ -312,51 +324,89 @@ export function PublicDemoTour({ currentPage }: { currentPage: PublicDemoTourPag
       window.removeEventListener("resize", update);
       window.removeEventListener("scroll", update, true);
     };
-  }, [tourState, view]);
+  }, [actionPending, tourState, view]);
 
   useEffect(() => {
     if (view !== "tour" || !tourState) return;
     const activeStep = PUBLIC_DEMO_TOUR_PAGES[tourState.pageIndex].steps[tourState.stepIndex];
+    if (!activeStep.actionId) return;
+    const action = document.querySelector<HTMLButtonElement>(`button[data-tour-action="${activeStep.actionId}"]`);
+    if (!action) return;
     const completionSelector = activeStep.completionSelector;
     let timer: number | undefined;
-    const scheduleAdvance = () => {
-      if (autoAdvance) timer = window.setTimeout(() => move("forward"), 2_400);
+    let actionClicked = false;
+    let completionCleared = !completionSelector || !document.querySelector(completionSelector);
+    const scheduleAdvance = (delay: number) => {
+      timer = window.setTimeout(() => move("forward"), delay);
     };
-    if (!completionSelector || document.querySelector(completionSelector)) {
-      scheduleAdvance();
-      return () => window.clearTimeout(timer);
+    const handleAction = () => {
+      actionClicked = true;
+      setActionPending(true);
+      setActionRect(null);
+      setClickPoint(null);
+      if (activeStep.actionId === "generateAi") {
+        writeState({ ...tourState, aiGenerated: true });
+        setAdvanceReady(false);
+        return;
+      }
+      const complete = !completionSelector || Boolean(document.querySelector(completionSelector));
+      setAdvanceReady(complete);
+      if (complete) scheduleAdvance(1_200);
+    };
+    action.addEventListener("click", handleAction, true);
+
+    if (!completionSelector) {
+      return () => {
+        action.removeEventListener("click", handleAction, true);
+        if (timer) window.clearTimeout(timer);
+      };
     }
 
     const observer = new MutationObserver(() => {
-      if (!document.querySelector(completionSelector)) return;
+      if (!actionClicked) return;
+      if (!document.querySelector(completionSelector)) {
+        completionCleared = true;
+        if (activeStep.actionId === "generateAi" && document.querySelector('[data-tour-ai-error="true"]')) {
+          actionClicked = false;
+          setActionPending(false);
+          setAdvanceReady(false);
+        }
+        return;
+      }
+      if (!completionCleared) return;
       observer.disconnect();
       setAdvanceReady(true);
-      if (activeStep.actionId === "generateAi") {
-        const generationAction = document.querySelector<HTMLButtonElement>('button[data-tour-action="generateAi"]');
-        generationAction?.removeAttribute("data-tour-trigger");
-        if (generationAction) generationAction.disabled = true;
-        const completedState = { ...tourState, aiGenerationComplete: true };
-        writeState(completedState);
-        setTourState(completedState);
-      } else {
-        scheduleAdvance();
+      if (activeStep.actionId !== "generateAi") {
+        scheduleAdvance(1_200);
+        return;
       }
+      const generationAction = document.querySelector<HTMLButtonElement>('button[data-tour-action="generateAi"]');
+      generationAction?.removeAttribute("data-tour-trigger");
+      if (generationAction) generationAction.disabled = true;
+      const completedState = { ...tourState, aiGenerated: true, aiGenerationComplete: true };
+      writeState(completedState);
+      timer = window.setTimeout(() => activate({ ...completedState, stepIndex: completedState.stepIndex + 1 }), 2_400);
     });
     observer.observe(document.body, { attributes: true, childList: true, subtree: true });
     return () => {
       observer.disconnect();
+      action.removeEventListener("click", handleAction, true);
       if (timer) window.clearTimeout(timer);
     };
-    // Restart the timer only when the displayed step changes.
+    // Restart observers only when the displayed step or persisted AI state changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoAdvance, tourState, view]);
+  }, [tourState, view]);
 
   const page = tourState ? PUBLIC_DEMO_TOUR_PAGES[tourState.pageIndex] : null;
   const step = page && tourState ? page.steps[tourState.stepIndex] : null;
   const viewportWidth = typeof window === "undefined" ? 1024 : window.innerWidth;
   const viewportHeight = typeof window === "undefined" ? 768 : window.innerHeight;
   const cardLeft = targetRect ? Math.min(Math.max(targetRect.left, 16), viewportWidth - 400) : 16;
-  const cardTop = targetRect ? Math.min(targetRect.bottom + 16, viewportHeight - 300) : 96;
+  const cardTop = targetRect
+    ? targetRect.top > viewportHeight * 0.58
+      ? Math.min(Math.max(16, targetRect.top - 280), viewportHeight - 240)
+      : Math.min(targetRect.bottom + 16, viewportHeight - 300)
+    : 96;
   const cardStyle = { "--tour-left": `${cardLeft}px`, "--tour-top": `${cardTop}px` } as React.CSSProperties;
 
   return (
@@ -388,15 +438,24 @@ export function PublicDemoTour({ currentPage }: { currentPage: PublicDemoTourPag
           />
         )}
 
+        {view === "tour" && actionRect && (
+          <span
+            data-testid="tour-action-highlight"
+            aria-hidden="true"
+            className="pointer-events-none fixed z-10 rounded-lg border-4 border-slate-700 bg-slate-200/20 shadow-[0_0_0_5px_rgba(255,255,255,0.8)]"
+            style={{ left: actionRect.left - 6, top: actionRect.top - 6, width: actionRect.width + 12, height: actionRect.height + 12 }}
+          />
+        )}
+
         {view === "tour" && clickPoint && (
           <span
             data-testid="tour-click-indicator"
             aria-hidden="true"
-            className="pointer-events-none fixed z-10 -translate-x-1/2 -translate-y-1/2"
+            className="pointer-events-none fixed z-20 -translate-x-1/2 -translate-y-1/2"
             style={clickPoint}
           >
-            <span className="absolute -inset-4 rounded-full border-4 border-red-500 bg-red-200/40 motion-safe:animate-ping" />
-            <span className="relative rounded-full bg-red-600 px-2 py-1 text-xs font-black text-white shadow-lg">클릭</span>
+            <span className="absolute -inset-5 rounded-full border-2 border-slate-500/60 bg-slate-300/30 motion-safe:animate-ping" />
+            <span className="relative block h-4 w-4 rounded-full border-2 border-white bg-slate-600/80 shadow-lg" />
           </span>
         )}
 
@@ -405,7 +464,7 @@ export function PublicDemoTour({ currentPage }: { currentPage: PublicDemoTourPag
             <p className="text-sm font-semibold text-blue-700">4개 공개 시연 둘러보기</p>
             <h2 id="public-demo-tour-title" className="mt-2 text-2xl font-bold">Node 공개 시연에 오신 것을 환영합니다</h2>
             <p id="public-demo-tour-description" className="mt-3 text-sm leading-6 text-slate-600">
-              안전한 합성 예시로 실제 AI 회의록 생성과 문서지원, 과업상황, 행정문서, 사후조치 기능을 자동 시연합니다.
+              표시된 실제 버튼을 직접 눌러 기능 변화를 확인합니다. 원하지 않는 단계는 넘어갈 수 있습니다.
             </p>
             <div className="mt-6 flex justify-end gap-2">
               <button type="button" onClick={() => close("dismissed")} className="border border-slate-300 px-4 py-2 text-sm font-semibold hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700">나중에</button>
@@ -417,17 +476,17 @@ export function PublicDemoTour({ currentPage }: { currentPage: PublicDemoTourPag
         {view === "tour" && page && step && tourState && (
           <section
             style={cardStyle}
-            className="pointer-events-auto fixed bottom-0 left-0 w-full border border-slate-300 bg-white p-5 shadow-2xl [top:auto] sm:bottom-auto sm:w-96 sm:[left:var(--tour-left)] sm:[top:var(--tour-top)]"
+            className="pointer-events-auto fixed bottom-0 left-0 max-h-[calc(100dvh-1rem)] w-full overflow-y-auto border border-slate-300 bg-white p-5 shadow-2xl [top:auto] sm:bottom-auto sm:w-96 sm:[left:var(--tour-left)] sm:[top:var(--tour-top)]"
           >
-            <p className="text-xs font-semibold text-blue-700">{autoAdvance ? "자동 시연 중" : "단계별 시연 중"} · 화면 {tourState.pageIndex + 1}/4 · 단계 {tourState.stepIndex + 1}/{page.steps.length}</p>
+            <p className="text-xs font-semibold text-blue-700">직접 체험 중 · 화면 {tourState.pageIndex + 1}/4 · 단계 {tourState.stepIndex + 1}/{page.steps.length}</p>
             <h2 id="public-demo-tour-title" className="mt-2 text-lg font-bold">{step.title}</h2>
             <p id="public-demo-tour-description" className="mt-2 text-sm leading-6 text-slate-600">{step.description}</p>
             <div className="mt-5 flex items-center justify-between gap-2">
-              <button type="button" onClick={() => close("dismissed")} className="text-sm font-semibold text-slate-600 underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700">종료</button>
+              <button type="button" disabled={actionPending} onClick={() => close("dismissed")} className="text-sm font-semibold text-slate-600 underline-offset-4 hover:underline disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700">종료</button>
               <div className="flex gap-2">
-                <button type="button" disabled={!readyToAdvance || (tourState.pageIndex === 0 && tourState.stepIndex === 0)} onClick={() => move("backward")} className="border border-slate-300 px-3 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700">이전</button>
-                <button type="button" autoFocus disabled={!readyToAdvance} onClick={() => move("forward")} className="bg-blue-700 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700">
-                  {tourState.pageIndex === PUBLIC_DEMO_TOUR_PAGES.length - 1 && tourState.stepIndex === page.steps.length - 1 ? "완료" : "다음"}
+                <button type="button" disabled={actionPending || (tourState.pageIndex === 0 && tourState.stepIndex === 0)} onClick={() => move("backward", true)} className="border border-slate-300 px-3 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700">이전</button>
+                <button type="button" autoFocus disabled={actionPending} onClick={skip} className="bg-blue-700 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700">
+                  {tourState.pageIndex === PUBLIC_DEMO_TOUR_PAGES.length - 1 && tourState.stepIndex === page.steps.length - 1 ? "완료" : "넘어가기"}
                 </button>
               </div>
             </div>

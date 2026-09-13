@@ -128,3 +128,4 @@
 - [x] Harden tutorial actions with stable selectors, fail-closed missing-control behavior, and no-mutation/no-download E2E guards.
 - [x] Convert the public-demo tutorial from manual spotlight steps to an automatic visible click walkthrough.
 - [x] Demonstrate one real public Gemini-generation path in the tutorial using only the exact synthetic catalog fixture.
+- [x] Replace automatic tutorial clicks with highlighted manual controls, a non-mutating `넘어가기` path, and a visible spinning/glowing AI-generation state.
